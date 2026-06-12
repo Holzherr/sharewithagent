@@ -19,6 +19,7 @@
   .brand .mark { width:20px; height:20px; color:var(--accent); flex:0 0 auto; }
   .grp { display:flex; gap:2px; background:var(--bg); border:1px solid var(--line); border-radius:9px; padding:2px; }
   .grp button { border:none; background:transparent; padding:6px 11px; border-radius:7px; font-size:13px; color:var(--sub); display:flex; align-items:center; gap:6px; }
+  .ti { width:15px; height:15px; flex:0 0 auto; }
   .grp button.on { background:#fff; color:var(--ink); box-shadow:0 1px 2px rgba(15,23,42,.08); font-weight:600; }
   .spacer { flex:1; }
   .btn { border:1px solid var(--line); background:#fff; padding:7px 12px; border-radius:8px; font-size:13px; color:var(--ink); font-weight:500; }
@@ -77,7 +78,11 @@
   .card .sel-path { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px; color:var(--sub); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; }
   .quote { font-size:11.5px; color:var(--ink); background:#fafaff; border-left:3px solid var(--accent2); border-radius:0 6px 6px 0; padding:5px 8px; margin-bottom:6px; line-height:1.4; }
   .inote .quote { max-width:206px; }
-  .selbtn { position:absolute; z-index:2147483647; background:var(--accent); color:#fff; border:none; border-radius:8px; padding:6px 11px; font-size:12px; font-weight:600; box-shadow:0 4px 14px rgba(79,70,229,.5); pointer-events:auto; cursor:pointer; display:none; transform:translateY(4px); }
+  /* plannotator-style floating selection toolbar */
+  .seltools { position:absolute; z-index:2147483647; display:none; align-items:center; gap:2px; background:#fff; border:1px solid var(--line); border-radius:10px; box-shadow:0 6px 22px rgba(15,23,42,.22); padding:4px; pointer-events:auto; transform:translate(-50%,-118%); }
+  .seltools button { border:none; background:transparent; cursor:pointer; font-size:15px; line-height:1; padding:6px 8px; border-radius:7px; }
+  .seltools button:hover { background:var(--bg); }
+  .seltools .sep { width:1px; align-self:stretch; background:var(--line); margin:2px 1px; }
   .card textarea { width:100%; border:1px solid var(--line); border-radius:8px; padding:8px; font-size:13px; font-family:inherit; resize:vertical; min-height:46px; color:var(--ink); }
   .card textarea:focus { outline:none; border-color:var(--accent); }
   .card .meta { display:flex; gap:6px; margin-top:7px; flex-wrap:wrap; align-items:center; }
@@ -108,10 +113,8 @@
 <div class="bar">
   <div class="brand"><svg class="mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="4.5" cy="5.5" r="2"/><circle cx="4.5" cy="18.5" r="2"/><path d="M6.4 6.5 11.5 9.4M6.4 17.5 11.5 14.6"/><rect x="11.5" y="7.5" width="10" height="9" rx="2.2"/><path d="M16.5 7.5V5"/><circle cx="16.5" cy="4.1" r="0.8" fill="currentColor" stroke="none"/><circle cx="15" cy="11.4" r="0.95" fill="currentColor" stroke="none"/><circle cx="18.5" cy="11.4" r="0.95" fill="currentColor" stroke="none"/><path d="M15 14.2h3.5"/></svg><span id="brandName">ShareWithAgent</span></div>
   <div class="grp" id="tools">
-    <button data-tool="select" class="on" title="Select / move (V)">▣ Select</button>
-    <button data-tool="pin" title="Drop a pin (P)">📍 Pin</button>
-    <button data-tool="box" title="Draw a box (B)">▢ Box</button>
-    <button data-tool="hide" title="Hide an element — e.g. a cookie banner (H)">🧹 Hide</button>
+    <button data-tool="select" class="on" title="Select text to comment (V)"><svg class="ti" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5H6.5A2.5 2.5 0 0 0 4 7.5M16 5h1.5A2.5 2.5 0 0 1 20 7.5M8 19H6.5A2.5 2.5 0 0 1 4 16.5M16 19h1.5a2.5 2.5 0 0 0 2.5-2.5M12 8v8"/></svg>Select</button>
+    <button data-tool="pin" title="Pinpoint an element (P)"><svg class="ti" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="5.5"/><path d="M12 2.5v3.5M12 18v3.5M2.5 12h3.5M18 12h3.5"/></svg>Pinpoint</button>
   </div>
   <button class="btn" id="clearOverlays" title="Auto-remove cookie banners & modal overlays from the snapshot">🍪 Clear overlays</button>
   <div class="grp" id="viewports">
@@ -139,7 +142,9 @@
   <div class="stage" id="stage">
     <div class="frameWrap" id="frameWrap" style="width:1024px;height:720px">
       <iframe id="frame" sandbox="allow-same-origin allow-scripts allow-forms allow-popups" title="Captured page"></iframe>
-      <div class="overlay" id="overlay"><div class="hl" id="hl"></div><div class="band" id="band"></div><button class="selbtn" id="selbtn">💬 Comment</button></div>
+      <div class="overlay" id="overlay"><div class="hl" id="hl"></div><div class="band" id="band"></div>
+        <div class="seltools" id="seltools"><button data-s="comment" title="Comment on selection">💬</button><span class="sep"></span><button data-s="copy" title="Copy text">📋</button><button data-s="x" title="Dismiss">✕</button></div>
+      </div>
     </div>
     <div class="nosnap" id="nosnap"><div><div style="font-size:30px;margin-bottom:8px">🔗🤖</div><b>Annotations-only link</b><br>The page snapshot isn’t embedded (keeps the link tiny). The feedback is in the panel on the right.<br><span style="font-size:12px">For the full visual review, use the <b>.html</b> export instead.</span></div></div>
   </div>
@@ -263,59 +268,59 @@ $('#viewports').onclick = e => { const b=e.target.closest('button'); if(!b) retu
 /* ---------- tools ---------- */
 $('#tools').onclick = e => { const b=e.target.closest('button'); if(!b) return; setTool(b.dataset.tool); };
 function setTool(t){ state.tool=t; [...$('#tools').children].forEach(x=>x.classList.toggle('on', x.dataset.tool===t));
-  const armed = t==='pin'||t==='box'||t==='hide';
-  overlay.classList.toggle('arming', armed); overlay.classList.toggle('hidemode', t==='hide');
-  if(!armed){ hl.style.display='none'; } }
+  overlay.classList.toggle('arming', t==='pin');   // Pinpoint mode arms the overlay; Select leaves the page selectable
+  if(t!=='pin'){ hl.style.display='none'; } }
 document.addEventListener('keydown', e=>{ if(e.target.matches('textarea,input')) return;
-  if(e.key==='v')setTool('select'); if(e.key==='p')setTool('pin'); if(e.key==='b')setTool('box'); if(e.key==='h')setTool('hide'); });
+  if(e.key==='v')setTool('select'); if(e.key==='p')setTool('pin'); });
 
 /* ---------- frame wiring — all interaction runs on the (armed) overlay, hit-testing the
    iframe via elementFromPoint. The overlay sits on top, so we can't rely on the iframe
    receiving clicks; this keeps Pin, Box, Hide and the hover highlight all working. ---------- */
 function wireFrame(){
   const doc = frame.contentDocument;
-  frame.contentWindow.addEventListener('scroll', renderAll, {passive:true});
-  let drag=null;
+  frame.contentWindow.addEventListener('scroll', ()=>{ seltools.style.display='none'; renderAll(); }, {passive:true});
+  // inject highlight styles into the snapshot so marks render inside the iframe
+  const st = doc.createElement('style');
+  st.textContent = 'mark.swa-hl{background:#fde047;color:inherit;border-radius:2px;cursor:pointer;box-shadow:0 0 0 1px rgba(202,138,4,.35)}mark.swa-hl.resolved{background:#e2e8f0;color:#64748b}';
+  doc.head.appendChild(st);
+
   const pt = e => { const r=overlay.getBoundingClientRect(); const x=e.clientX-r.left, y=e.clientY-r.top; return {x, y, el:doc.elementFromPoint(x,y)}; };
 
+  // ---- Pinpoint mode: hover highlight + click to anchor a pin ----
   overlay.addEventListener('mousemove', e=>{
-    if(state.tool==='select'){ hl.style.display='none'; return; }
-    if(drag && state.tool==='box'){ const r=overlay.getBoundingClientRect(); const x=e.clientX-r.left, y=e.clientY-r.top;
-      band.style.display='block'; band.style.left=Math.min(drag.x,x)+'px'; band.style.top=Math.min(drag.y,y)+'px';
-      band.style.width=Math.abs(x-drag.x)+'px'; band.style.height=Math.abs(y-drag.y)+'px'; hl.style.display='none'; return; }
+    if(state.tool!=='pin'){ hl.style.display='none'; return; }
     const {el}=pt(e); if(!el || el===doc.documentElement || el===doc.body){ hl.style.display='none'; return; }
     const r=el.getBoundingClientRect(); hl.style.display='block'; hl.style.left=r.left+'px'; hl.style.top=r.top+'px'; hl.style.width=r.width+'px'; hl.style.height=r.height+'px';
   });
   overlay.addEventListener('mouseleave', ()=>{ hl.style.display='none'; });
-  overlay.addEventListener('mousedown', e=>{ if(state.tool!=='box') return; e.preventDefault(); const {x,y}=pt(e); drag={x,y}; });
-  overlay.addEventListener('mouseup', e=>{
-    const {x,y,el}=pt(e);
-    if(state.tool==='pin'){ if(el) addPin(el); }
-    else if(state.tool==='hide'){ if(el && el!==doc.body && el!==doc.documentElement){
-      // climb to the outermost fixed/sticky ancestor so one click removes a whole cookie modal + its backdrop
-      let t=el, p=el; while(p && p!==doc.body){ const pos=frame.contentWindow.getComputedStyle(p).position; if(pos==='fixed'||pos==='sticky') t=p; p=p.parentElement; }
-      t.style.setProperty('display','none','important'); hl.style.display='none'; renderAll(); toast('Removed — click again for any leftover overlay, or use 🍪 Clear overlays'); } }
-    else if(state.tool==='box' && drag){ const box={x:Math.min(drag.x,x),y:Math.min(drag.y,y),w:Math.abs(x-drag.x),h:Math.abs(y-drag.y)};
-      band.style.display='none'; drag=null; if(box.w>=6 && box.h>=6) addBoxAt(box); }
-  });
+  overlay.addEventListener('mouseup', e=>{ if(state.tool==='pin'){ const {el}=pt(e); if(el) addPin(el); } });
 
-  // text selection → "Comment" button (Select mode; overlay isn't armed so the iframe gets the selection)
-  const selbtn = $('#selbtn');
-  let pendingSel = null;
+  // ---- Select mode: native text selection → yellow highlight + floating toolbar ----
+  const seltools = $('#seltools'); let pendingSel = null;
   doc.addEventListener('mouseup', ()=>{
     if(state.tool!=='select') return;
     setTimeout(()=>{
       const sel = doc.getSelection(); const txt = sel && sel.toString().trim();
-      if(!txt || sel.isCollapsed){ selbtn.style.display='none'; pendingSel=null; return; }
-      const range = sel.getRangeAt(0); const r = range.getBoundingClientRect();
-      let el = range.commonAncestorContainer; if(el.nodeType!==1) el = el.parentElement;
-      pendingSel = { el, text: txt.slice(0,400) };
-      selbtn.style.display='block'; selbtn.style.left=Math.max(2, r.right-10)+'px'; selbtn.style.top=(r.bottom)+'px';
+      if(!txt || sel.isCollapsed){ seltools.style.display='none'; pendingSel=null; return; }
+      const range = sel.getRangeAt(0).cloneRange(); const r = range.getBoundingClientRect();
+      pendingSel = { range, text: txt.slice(0,400) };
+      seltools.style.display='flex'; seltools.style.left=(r.left + r.width/2)+'px'; seltools.style.top=(r.top)+'px';
     }, 0);
   });
-  doc.addEventListener('mousedown', ()=>{ selbtn.style.display='none'; });
-  selbtn.onclick = ()=>{ if(!pendingSel) return; addSelectionNote(pendingSel.el, pendingSel.text);
-    selbtn.style.display='none'; try{ doc.getSelection().removeAllRanges(); }catch(e){} pendingSel=null; };
+  doc.addEventListener('mousedown', ()=>{ seltools.style.display='none'; });
+  doc.addEventListener('click', e=>{ const m=e.target.closest && e.target.closest('mark.swa-hl'); if(m){ e.preventDefault(); select(m.dataset.id); } });
+  seltools.onclick = e => { const b=e.target.closest('button'); if(!b||!pendingSel) return; const k=b.dataset.s;
+    if(k==='copy'){ navigator.clipboard.writeText(pendingSel.text); toast('Text copied'); }
+    if(k==='comment'){ const mark=highlightRange(doc, pendingSel.range); addSelectionNote(mark, pendingSel.text); }
+    seltools.style.display='none'; try{ doc.getSelection().removeAllRanges(); }catch(e2){} pendingSel=null;
+  };
+}
+// wrap a range in <mark class="swa-hl"> (robust across element boundaries)
+function highlightRange(doc, range){
+  const mark=doc.createElement('mark'); mark.className='swa-hl';
+  try { range.surroundContents(mark); }
+  catch(e){ mark.appendChild(range.extractContents()); range.insertNode(mark); }
+  return mark;
 }
 
 /* ---------- anchoring ---------- */
@@ -348,10 +353,14 @@ function addPin(el){
   const a={ id:'a'+(++state.seq), type:'pin', comment:'', status:'open', viewport:VIEWPORTS[state.viewport].label, anchor:anchorFor(el) };
   state.annotations.push(a); state.selected=a.id; setTool('select'); renderAll(); focusComment(a.id);
 }
-function addSelectionNote(el, text){
-  const a={ id:'a'+(++state.seq), type:'text', comment:'', status:'open', viewport:VIEWPORTS[state.viewport].label, anchor:{...anchorFor(el), selectedText:text} };
-  state.annotations.push(a); state.selected=a.id; renderAll(); focusComment(a.id);
+function addSelectionNote(mark, text){
+  const id='a'+(++state.seq); mark.dataset.id=id;
+  const host = mark.parentElement || mark;
+  const a={ id, type:'text', comment:'', status:'open', viewport:VIEWPORTS[state.viewport].label, anchor:{...anchorFor(host), selectedText:text} };
+  state.annotations.push(a); state.selected=id; renderAll(); focusComment(id);
 }
+function removeMark(id){ const doc=frame.contentDocument; const m=doc&&doc.querySelector(`mark.swa-hl[data-id="${id}"]`);
+  if(m){ const p=m.parentNode; while(m.firstChild) p.insertBefore(m.firstChild,m); p.removeChild(m); if(p.normalize) p.normalize(); } }
 function addBoxAt(box){
   const doc=frame.contentDocument;
   const el = doc.elementFromPoint(box.x+box.w/2, box.y+box.h/2) || doc.body;
@@ -364,28 +373,34 @@ function addBoxAt(box){
 function renderAll(){ if(state.snapshot) renderOverlay(); renderList(); $('#count').textContent = state.annotations.length+' item'+(state.annotations.length===1?'':'s'); }
 function renderOverlay(){
   [...overlay.querySelectorAll('.pin,.boxann,.inote')].forEach(n=>n.remove());
-  const sy = frame.contentWindow ? (frame.contentWindow.scrollY||0) : 0;
+  const doc = frame.contentDocument; const sy = frame.contentWindow ? (frame.contentWindow.scrollY||0) : 0;
   state.annotations.forEach((a,i)=>{
-    const bx = a.type==='box' ? a.box : a.anchor.boundingBox;
-    const px = bx.x + (a.type==='box'?0:bx.w/2), py = bx.y - sy;
-    if(a.type==='box'){ const d=document.createElement('div'); d.className='boxann'+(a.status==='resolved'?' resolved':'');
-      d.style.left=a.box.x+'px'; d.style.top=(a.box.y - sy)+'px'; d.style.width=a.box.w+'px'; d.style.height=a.box.h+'px';
-      d.onclick=()=>select(a.id); overlay.appendChild(d); }
-    const p=document.createElement('div'); p.className='pin'+(a.status==='resolved'?' resolved':'')+(a.id===state.selected?' sel':'');
-    p.style.left=px+'px'; p.style.top=py+'px'; p.textContent=i+1; p.onclick=()=>select(a.id); overlay.appendChild(p);
-    // inline comment bubble: editable for the selected pin, read-only chip for others that have a comment
+    let px, py;
+    if(a.type==='text'){
+      // the yellow highlight IS the marker — position the bubble at it, no numbered pin
+      const m = doc && doc.querySelector(`mark.swa-hl[data-id="${a.id}"]`);
+      if(m){ m.classList.toggle('resolved', a.status==='resolved'); const r=m.getBoundingClientRect(); px=r.right; py=r.top + r.height/2; }
+      else { const bx=a.anchor.boundingBox; px=bx.x + bx.w/2; py=bx.y - sy; }   // fallback (reopened export, no live marks)
+    } else {
+      const bx = a.type==='box' ? a.box : a.anchor.boundingBox;
+      px = bx.x + (a.type==='box'?0:bx.w/2); py = bx.y - sy;
+      if(a.type==='box'){ const d=document.createElement('div'); d.className='boxann'+(a.status==='resolved'?' resolved':'');
+        d.style.left=a.box.x+'px'; d.style.top=(a.box.y - sy)+'px'; d.style.width=a.box.w+'px'; d.style.height=a.box.h+'px'; d.onclick=()=>select(a.id); overlay.appendChild(d); }
+      const p=document.createElement('div'); p.className='pin'+(a.status==='resolved'?' resolved':'')+(a.id===state.selected?' sel':'');
+      p.style.left=px+'px'; p.style.top=py+'px'; p.textContent=i+1; p.onclick=()=>select(a.id); overlay.appendChild(p);
+    }
     if(a.id===state.selected){
       const n=document.createElement('div'); n.className='inote'; n.dataset.id=a.id;
-      n.style.left=(px+18)+'px'; n.style.top=py+'px';
+      n.style.left=(px+(a.type==='text'?10:18))+'px'; n.style.top=py+'px';
       n.innerHTML=`${a.anchor.selectedText?`<div class="quote">“${esc(a.anchor.selectedText.slice(0,160))}”</div>`:''}<textarea placeholder="Describe the issue…">${esc(a.comment)}</textarea>
         <div class="ia"><button data-a="resolve">${a.status==='resolved'?'Reopen':'Resolve'}</button><button data-a="del">Delete</button><button data-a="done" class="done">Done</button></div>`;
       const ta=n.querySelector('textarea');
       ta.oninput=()=>{ a.comment=ta.value; const sc=$(`.card[data-id="${a.id}"] textarea`); if(sc) sc.value=ta.value; };
       n.querySelector('[data-a=resolve]').onclick=()=>{ a.status=a.status==='resolved'?'open':'resolved'; renderAll(); };
-      n.querySelector('[data-a=del]').onclick=()=>{ state.annotations=state.annotations.filter(x=>x.id!==a.id); state.selected=null; renderAll(); };
+      n.querySelector('[data-a=del]').onclick=()=>{ if(a.type==='text') removeMark(a.id); state.annotations=state.annotations.filter(x=>x.id!==a.id); state.selected=null; renderAll(); };
       n.querySelector('[data-a=done]').onclick=()=>{ state.selected=null; renderAll(); };
       overlay.appendChild(n);
-    } else if((a.comment||'').trim()){
+    } else if((a.comment||'').trim() && a.type!=='text'){
       const n=document.createElement('div'); n.className='inote chip'+(a.status==='resolved'?' resolved':''); n.dataset.id=a.id;
       n.style.left=(px+18)+'px'; n.style.top=py+'px';
       n.textContent=a.comment.trim().slice(0,90); n.onclick=()=>select(a.id); overlay.appendChild(n);
@@ -394,7 +409,7 @@ function renderOverlay(){
 }
 function renderList(){
   const list=$('#list');
-  if(!state.annotations.length){ list.innerHTML='<div class="empty">No annotations yet.<br><b>Select text</b> to comment, or pick <b>Pin</b> / <b>Box</b> and click the page.</div>'; return; }
+  if(!state.annotations.length){ list.innerHTML='<div class="empty">No annotations yet.<br><b>Select</b> text to highlight &amp; comment, or use <b>Pinpoint</b> to click an element.</div>'; return; }
   list.innerHTML='';
   state.annotations.forEach((a,i)=>{
     const c=document.createElement('div'); c.className='card'+(a.status==='resolved'?' resolved':'')+(a.id===state.selected?' sel':''); c.dataset.id=a.id;
@@ -404,7 +419,7 @@ function renderList(){
         <div class="acts"><button data-act="resolve">${a.status==='resolved'?'Reopen':'Resolve'}</button><button data-act="del">Delete</button></div></div>`;
     c.querySelector('textarea').oninput=e=>{ a.comment=e.target.value; const ie=overlay.querySelector(`.inote[data-id="${a.id}"] textarea`); if(ie) ie.value=e.target.value; };
     c.querySelector('[data-act=resolve]').onclick=()=>{ a.status=a.status==='resolved'?'open':'resolved'; renderAll(); };
-    c.querySelector('[data-act=del]').onclick=()=>{ state.annotations=state.annotations.filter(x=>x.id!==a.id); renderAll(); };
+    c.querySelector('[data-act=del]').onclick=()=>{ if(a.type==='text') removeMark(a.id); state.annotations=state.annotations.filter(x=>x.id!==a.id); renderAll(); };
     c.querySelector('.top').onclick=()=>select(a.id);
     list.appendChild(c);
   });
@@ -435,7 +450,9 @@ function shareLink(){ /* annotations only — never the snapshot, or the URL exp
   const data={url:state.pageUrl,viewport:state.viewport,annotations:state.annotations};
   return location.origin+location.pathname+'#'+LZString.compressToEncodedURIComponent(JSON.stringify(data)); }
 function selfContainedHtml(){
-  const data={snapshot:state.snapshot,url:state.pageUrl,viewport:state.viewport,annotations:state.annotations};
+  // capture the CURRENT iframe DOM so highlights + hidden overlays persist in the export
+  const snap = (frame.contentDocument ? '<!doctype html>'+frame.contentDocument.documentElement.outerHTML : state.snapshot);
+  const data={snapshot:snap,url:state.pageUrl,viewport:state.viewport,annotations:state.annotations};
   // ship the current document with embedded data → opening it reconstructs the review
   const docHtml=document.documentElement.outerHTML.replace(/<script id="embed">[\s\S]*?<\/script>/,'');
   const inject=`<script id="embed">window.__EMBED__=${JSON.stringify(data)};addEventListener('DOMContentLoaded',()=>setTimeout(()=>{if(window.__EMBED__)hydrate(window.__EMBED__)},0));<\/script>`;
