@@ -37,6 +37,8 @@
   .main { flex:1; display:flex; min-height:0; }
   .stage { flex:1; position:relative; overflow:auto; background:#eef2f6 repeating-linear-gradient(45deg,transparent,transparent 9px,rgba(15,23,42,.015) 9px,rgba(15,23,42,.015) 18px); display:flex; justify-content:center; padding:22px; }
   .frameWrap { position:relative; background:#fff; box-shadow:0 6px 30px rgba(15,23,42,.12); align-self:flex-start; transition:width .18s ease; }
+  .nosnap { display:none; flex:1; align-items:center; justify-content:center; text-align:center; color:var(--sub); font-size:14px; line-height:1.6; padding:40px; }
+  #clearOverlays { white-space:nowrap; }
   iframe { display:block; border:0; width:100%; height:100%; background:#fff; }
   .overlay { position:absolute; inset:0; pointer-events:none; }
   .overlay.arming { pointer-events:auto; cursor:crosshair; }
@@ -111,6 +113,7 @@
     <button data-tool="box" title="Draw a box (B)">▢ Box</button>
     <button data-tool="hide" title="Hide an element — e.g. a cookie banner (H)">🧹 Hide</button>
   </div>
+  <button class="btn" id="clearOverlays" title="Auto-remove cookie banners & modal overlays from the snapshot">🍪 Clear overlays</button>
   <div class="grp" id="viewports">
     <button data-vw="desktop" class="on">🖥 Desktop</button>
     <button data-vw="mobile">📱 Mobile</button>
@@ -138,6 +141,7 @@
       <iframe id="frame" sandbox="allow-same-origin allow-scripts allow-forms allow-popups" title="Captured page"></iframe>
       <div class="overlay" id="overlay"><div class="hl" id="hl"></div><div class="band" id="band"></div><button class="selbtn" id="selbtn">💬 Comment</button></div>
     </div>
+    <div class="nosnap" id="nosnap"><div><div style="font-size:30px;margin-bottom:8px">🔗🤖</div><b>Annotations-only link</b><br>The page snapshot isn’t embedded (keeps the link tiny). The feedback is in the panel on the right.<br><span style="font-size:12px">For the full visual review, use the <b>.html</b> export instead.</span></div></div>
   </div>
   <aside class="side">
     <div class="head"><h2>Feedback</h2><span class="count" id="count">0 items</span></div>
@@ -223,12 +227,17 @@ const frame = $('#frame'), overlay = $('#overlay'), hl = $('#hl'), band = $('#ba
 })();
 
 function hydrate(data){
-  state.snapshot = data.snapshot; state.pageUrl = data.url||''; state.viewport = data.viewport||'desktop';
+  state.snapshot = data.snapshot || ''; state.pageUrl = data.url||''; state.viewport = data.viewport||'desktop';
   state.annotations = (data.annotations||[]).map(a=>({...a}));
   state.seq = state.annotations.length;
   applyViewport(); $('#loader').classList.add('hidden');
-  frame.srcdoc = state.snapshot;
-  frame.addEventListener('load', ()=>{ wireFrame(); renderAll(); }, {once:true});
+  if (state.snapshot) {
+    frame.srcdoc = state.snapshot;
+    frame.addEventListener('load', ()=>{ wireFrame(); renderAll(); }, {once:true});
+  } else {
+    // annotations-only share link (tiny URL): no visual snapshot embedded
+    $('#nosnap').style.display='flex'; renderAll();
+  }
 }
 
 /* ---------- loaders ---------- */
@@ -282,7 +291,10 @@ function wireFrame(){
   overlay.addEventListener('mouseup', e=>{
     const {x,y,el}=pt(e);
     if(state.tool==='pin'){ if(el) addPin(el); }
-    else if(state.tool==='hide'){ if(el && el!==doc.body && el!==doc.documentElement){ el.style.setProperty('display','none','important'); hl.style.display='none'; renderAll(); toast('Element hidden — click again for any leftover overlay'); } }
+    else if(state.tool==='hide'){ if(el && el!==doc.body && el!==doc.documentElement){
+      // climb to the outermost fixed/sticky ancestor so one click removes a whole cookie modal + its backdrop
+      let t=el, p=el; while(p && p!==doc.body){ const pos=frame.contentWindow.getComputedStyle(p).position; if(pos==='fixed'||pos==='sticky') t=p; p=p.parentElement; }
+      t.style.setProperty('display','none','important'); hl.style.display='none'; renderAll(); toast('Removed — click again for any leftover overlay, or use 🍪 Clear overlays'); } }
     else if(state.tool==='box' && drag){ const box={x:Math.min(drag.x,x),y:Math.min(drag.y,y),w:Math.abs(x-drag.x),h:Math.abs(y-drag.y)};
       band.style.display='none'; drag=null; if(box.w>=6 && box.h>=6) addBoxAt(box); }
   });
@@ -349,7 +361,7 @@ function addBoxAt(box){
 }
 
 /* ---------- render ---------- */
-function renderAll(){ renderOverlay(); renderList(); $('#count').textContent = state.annotations.length+' item'+(state.annotations.length===1?'':'s'); }
+function renderAll(){ if(state.snapshot) renderOverlay(); renderList(); $('#count').textContent = state.annotations.length+' item'+(state.annotations.length===1?'':'s'); }
 function renderOverlay(){
   [...overlay.querySelectorAll('.pin,.boxann,.inote')].forEach(n=>n.remove());
   const sy = frame.contentWindow ? (frame.contentWindow.scrollY||0) : 0;
@@ -419,7 +431,8 @@ function toMarkdown(){
   return s;
 }
 function download(name, text, type='text/plain'){ const b=new Blob([text],{type}); const u=URL.createObjectURL(b); const a=document.createElement('a'); a.href=u; a.download=name; a.click(); URL.revokeObjectURL(u); }
-function shareLink(){ const data={snapshot:state.snapshot,url:state.pageUrl,viewport:state.viewport,annotations:state.annotations};
+function shareLink(){ /* annotations only — never the snapshot, or the URL explodes (megabytes). The agent needs the text, not the picture. */
+  const data={url:state.pageUrl,viewport:state.viewport,annotations:state.annotations};
   return location.origin+location.pathname+'#'+LZString.compressToEncodedURIComponent(JSON.stringify(data)); }
 function selfContainedHtml(){
   const data={snapshot:state.snapshot,url:state.pageUrl,viewport:state.viewport,annotations:state.annotations};
@@ -435,11 +448,27 @@ $('#exportMenu .pop').onclick = e => { const b=e.target.closest('button'); if(!b
   if(k==='json') download('feedback.json', JSON.stringify(buildPayload(),null,2), 'application/json');
   if(k==='md') download('feedback.md', toMarkdown(), 'text/markdown');
   if(k==='html') download('review.html', selfContainedHtml(), 'text/html');
-  if(k==='link'){ navigator.clipboard.writeText(shareLink()); toast('Share link copied to clipboard'); }
+  if(k==='link'){ const u=shareLink(); navigator.clipboard.writeText(u); toast(`Annotations-only link copied (${(u.length/1024).toFixed(1)} KB) — snapshot not included`); }
   if(k==='new'){ location.href=location.pathname; }
   $('#exportMenu').classList.remove('open');
 };
 $('#copyBtn').onclick = ()=>{ navigator.clipboard.writeText(toMarkdown()); toast('Markdown feedback copied — paste into your agent'); };
+
+/* ---------- auto-clear cookie banners / modal overlays from the snapshot ---------- */
+$('#clearOverlays').onclick = ()=>{
+  const doc=frame.contentDocument, win=frame.contentWindow; if(!doc||!win){ toast('Load a page first'); return; }
+  const vw=win.innerWidth, vh=win.innerHeight; let n=0;
+  [...doc.body.querySelectorAll('*')].forEach(el=>{
+    const cs=win.getComputedStyle(el); if(cs.display==='none') return;
+    const pos=cs.position, z=parseInt(cs.zIndex)||0, r=el.getBoundingClientRect();
+    const big = r.width*r.height > vw*vh*0.2;
+    const idcls=(el.id+' '+(typeof el.className==='string'?el.className:'')).toLowerCase();
+    const consenty=/cookie|consent|gdpr|\bcmp\b|banner|backdrop|overlay|modal|dialog/.test(idcls);
+    const fixedish = pos==='fixed'||pos==='sticky';
+    if((fixedish && (big || z>=999)) || (consenty && (fixedish||big))){ el.style.setProperty('display','none','important'); n++; }
+  });
+  renderAll(); toast(n ? `Cleared ${n} overlay element(s)` : 'No obvious overlays found — use the 🧹 Hide tool to click one');
+};
 
 /* ---------- CLI / skill return ---------- */
 $('#sendBtn').onclick = async ()=>{
