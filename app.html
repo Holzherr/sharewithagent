@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ShareWithAgent — annotate · v0.1</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234f46e5' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><circle cx='4.5' cy='5.5' r='2'/><circle cx='4.5' cy='18.5' r='2'/><path d='M6.4 6.5 11.5 9.4M6.4 17.5 11.5 14.6'/><rect x='11.5' y='7.5' width='10' height='9' rx='2.2'/><path d='M16.5 7.5V5'/></svg>" />
+<script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js"></script>
+<style>
+  :root { --ink:#0f172a; --sub:#64748b; --line:#e2e8f0; --accent:#4f46e5; --accent2:#6366f1; --bg:#f8fafc; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; color:var(--ink); background:var(--bg); }
+  body { display:flex; flex-direction:column; }
+  button { font-family:inherit; cursor:pointer; }
+
+  /* top bar */
+  .bar { display:flex; align-items:center; gap:10px; padding:8px 14px; background:#fff; border-bottom:1px solid var(--line); flex:0 0 auto; }
+  .brand { font-weight:700; letter-spacing:-0.01em; margin-right:6px; display:flex; align-items:center; gap:7px; }
+  .brand .mark { width:20px; height:20px; color:var(--accent); flex:0 0 auto; }
+  .grp { display:flex; gap:2px; background:var(--bg); border:1px solid var(--line); border-radius:9px; padding:2px; }
+  .grp button { border:none; background:transparent; padding:6px 11px; border-radius:7px; font-size:13px; color:var(--sub); display:flex; align-items:center; gap:6px; }
+  .grp button.on { background:#fff; color:var(--ink); box-shadow:0 1px 2px rgba(15,23,42,.08); font-weight:600; }
+  .spacer { flex:1; }
+  .btn { border:1px solid var(--line); background:#fff; padding:7px 12px; border-radius:8px; font-size:13px; color:var(--ink); font-weight:500; }
+  .btn:hover { border-color:#cbd5e1; }
+  .btn.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .btn.primary:hover { background:#4338ca; }
+  .btn.send { background:#059669; color:#fff; border-color:#059669; }
+  .menu { position:relative; }
+  .menu .pop { position:absolute; right:0; top:calc(100% + 6px); background:#fff; border:1px solid var(--line); border-radius:10px; box-shadow:0 8px 28px rgba(15,23,42,.14); padding:5px; min-width:210px; z-index:50; display:none; }
+  .menu.open .pop { display:block; }
+  .menu .pop button { display:block; width:100%; text-align:left; border:none; background:transparent; padding:9px 10px; border-radius:7px; font-size:13px; color:var(--ink); }
+  .menu .pop button:hover { background:var(--bg); }
+  .menu .pop .hint { font-size:11px; color:var(--sub); padding:2px 10px 7px; }
+
+  /* main */
+  .main { flex:1; display:flex; min-height:0; }
+  .stage { flex:1; position:relative; overflow:auto; background:#eef2f6 repeating-linear-gradient(45deg,transparent,transparent 9px,rgba(15,23,42,.015) 9px,rgba(15,23,42,.015) 18px); display:flex; justify-content:center; padding:22px; }
+  .frameWrap { position:relative; background:#fff; box-shadow:0 6px 30px rgba(15,23,42,.12); align-self:flex-start; transition:width .18s ease; }
+  iframe { display:block; border:0; width:100%; height:100%; background:#fff; }
+  .overlay { position:absolute; inset:0; pointer-events:none; }
+  .overlay.arming { pointer-events:auto; cursor:crosshair; }
+  .hl { position:absolute; border:2px solid var(--accent); background:rgba(79,70,229,.08); border-radius:3px; pointer-events:none; display:none; z-index:5; }
+  .pin { position:absolute; width:26px; height:26px; transform:translate(-50%,-50%); border-radius:50% 50% 50% 2px; background:var(--accent); color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(79,70,229,.5); pointer-events:auto; cursor:pointer; z-index:10; border:2px solid #fff; }
+  .pin.resolved { background:#94a3b8; box-shadow:0 2px 8px rgba(100,116,139,.4); }
+  .pin.sel { outline:3px solid rgba(99,102,241,.35); }
+  .boxann { position:absolute; border:2px solid var(--accent); border-radius:3px; background:rgba(79,70,229,.06); pointer-events:auto; cursor:pointer; z-index:8; }
+  .boxann.resolved { border-color:#94a3b8; background:rgba(148,163,184,.06); }
+  .overlay.arming { user-select:none; -webkit-user-select:none; }
+  .overlay.hidemode { cursor:not-allowed; }
+  .band { position:absolute; border:2px dashed var(--accent); background:rgba(79,70,229,.08); border-radius:3px; pointer-events:none; z-index:9; display:none; }
+  /* inline comment bubble on the page */
+  .inote { position:absolute; transform:translateY(-50%); max-width:230px; background:#fff; border:1px solid var(--line); border-radius:10px; box-shadow:0 6px 22px rgba(15,23,42,.22); padding:8px; z-index:2147483646; pointer-events:auto; font-size:12px; }
+  .inote.chip { padding:6px 9px; cursor:pointer; color:var(--ink); white-space:normal; line-height:1.35; border-left:3px solid var(--accent); }
+  .inote.chip.resolved { border-left-color:#94a3b8; color:var(--sub); }
+  .inote textarea { width:206px; border:1px solid var(--line); border-radius:7px; padding:7px; font-size:12px; font-family:inherit; resize:none; min-height:54px; color:var(--ink); }
+  .inote textarea:focus { outline:none; border-color:var(--accent); }
+  .inote .ia { display:flex; gap:4px; margin-top:6px; }
+  .inote .ia button { border:none; background:var(--bg); color:var(--sub); font-size:11px; padding:4px 8px; border-radius:6px; cursor:pointer; }
+  .inote .ia button:hover { background:#eef2ff; color:var(--accent); }
+  .inote .ia .done { margin-left:auto; background:var(--accent); color:#fff; }
+
+  /* sidebar */
+  .side { flex:0 0 340px; width:340px; min-width:340px; max-width:340px; background:#fff; border-left:1px solid var(--line); display:flex; flex-direction:column; min-height:0; }
+  .side .head { padding:12px 14px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; }
+  .side .head h2 { margin:0; font-size:13px; font-weight:700; }
+  .side .head .count { font-size:12px; color:var(--sub); }
+  .list { flex:1; overflow:auto; padding:10px; display:flex; flex-direction:column; gap:9px; min-width:0; }
+  .empty { color:var(--sub); font-size:13px; text-align:center; padding:34px 18px; line-height:1.5; }
+  .card { border:1px solid var(--line); border-radius:11px; padding:11px; background:#fff; }
+  .card.sel { border-color:var(--accent); box-shadow:0 0 0 3px rgba(79,70,229,.1); }
+  .card .top { display:flex; align-items:center; gap:8px; margin-bottom:7px; min-width:0; }
+  .card .num { width:20px; height:20px; border-radius:50%; background:var(--accent); color:#fff; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; flex:0 0 auto; }
+  .card.resolved .num { background:#94a3b8; }
+  .card .sel-path { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px; color:var(--sub); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; }
+  .quote { font-size:11.5px; color:var(--ink); background:#fafaff; border-left:3px solid var(--accent2); border-radius:0 6px 6px 0; padding:5px 8px; margin-bottom:6px; line-height:1.4; }
+  .inote .quote { max-width:206px; }
+  .selbtn { position:absolute; z-index:2147483647; background:var(--accent); color:#fff; border:none; border-radius:8px; padding:6px 11px; font-size:12px; font-weight:600; box-shadow:0 4px 14px rgba(79,70,229,.5); pointer-events:auto; cursor:pointer; display:none; transform:translateY(4px); }
+  .card textarea { width:100%; border:1px solid var(--line); border-radius:8px; padding:8px; font-size:13px; font-family:inherit; resize:vertical; min-height:46px; color:var(--ink); }
+  .card textarea:focus { outline:none; border-color:var(--accent); }
+  .card .meta { display:flex; gap:6px; margin-top:7px; flex-wrap:wrap; align-items:center; }
+  .tag { font-size:10px; padding:2px 7px; border-radius:999px; background:var(--bg); color:var(--sub); border:1px solid var(--line); }
+  .card .acts { margin-left:auto; display:flex; gap:4px; }
+  .card .acts button { border:none; background:transparent; color:var(--sub); font-size:12px; padding:3px 6px; border-radius:6px; }
+  .card .acts button:hover { background:var(--bg); color:var(--ink); }
+
+  /* loader */
+  .loader { position:absolute; inset:0; background:rgba(248,250,252,.96); z-index:100; display:flex; align-items:center; justify-content:center; }
+  .loader.hidden { display:none; }
+  .panel { background:#fff; border:1px solid var(--line); border-radius:16px; box-shadow:0 12px 50px rgba(15,23,42,.16); padding:26px; width:min(460px,92vw); }
+  .panel h1 { margin:0 0 4px; font-size:18px; display:flex; align-items:center; gap:9px; }
+  .panel p.lead { margin:0 0 18px; color:var(--sub); font-size:13px; line-height:1.5; }
+  .opt { display:flex; gap:11px; align-items:flex-start; padding:12px; border:1px solid var(--line); border-radius:11px; margin-bottom:9px; cursor:pointer; background:#fff; text-align:left; width:100%; }
+  .opt:hover { border-color:var(--accent); background:#fbfbff; }
+  .opt .ic { font-size:19px; flex:0 0 auto; }
+  .opt b { display:block; font-size:13px; }
+  .opt span { font-size:12px; color:var(--sub); }
+  .opt input[type=url] { margin-top:6px; width:100%; border:1px solid var(--line); border-radius:7px; padding:6px 8px; font-size:12px; }
+  .toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:var(--ink); color:#fff; padding:10px 16px; border-radius:10px; font-size:13px; z-index:200; opacity:0; transition:opacity .2s; pointer-events:none; }
+  .toast.show { opacity:1; }
+  .sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <div class="brand"><svg class="mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="4.5" cy="5.5" r="2"/><circle cx="4.5" cy="18.5" r="2"/><path d="M6.4 6.5 11.5 9.4M6.4 17.5 11.5 14.6"/><rect x="11.5" y="7.5" width="10" height="9" rx="2.2"/><path d="M16.5 7.5V5"/><circle cx="16.5" cy="4.1" r="0.8" fill="currentColor" stroke="none"/><circle cx="15" cy="11.4" r="0.95" fill="currentColor" stroke="none"/><circle cx="18.5" cy="11.4" r="0.95" fill="currentColor" stroke="none"/><path d="M15 14.2h3.5"/></svg><span id="brandName">ShareWithAgent</span></div>
+  <div class="grp" id="tools">
+    <button data-tool="select" class="on" title="Select / move (V)">▣ Select</button>
+    <button data-tool="pin" title="Drop a pin (P)">📍 Pin</button>
+    <button data-tool="box" title="Draw a box (B)">▢ Box</button>
+    <button data-tool="hide" title="Hide an element — e.g. a cookie banner (H)">🧹 Hide</button>
+  </div>
+  <div class="grp" id="viewports">
+    <button data-vw="desktop" class="on">🖥 Desktop</button>
+    <button data-vw="mobile">📱 Mobile</button>
+  </div>
+  <div class="spacer"></div>
+  <button class="btn send" id="sendBtn" style="display:none">⬆ Send to agent</button>
+  <button class="btn" id="copyBtn">📋 Copy feedback</button>
+  <div class="menu" id="exportMenu">
+    <button class="btn primary" id="exportToggle">Export ▾</button>
+    <div class="pop">
+      <div class="hint">For the agent</div>
+      <button data-exp="json">⬇ Structured JSON</button>
+      <button data-exp="md">⬇ Markdown digest</button>
+      <button data-exp="link">🔗 Copy share link</button>
+      <div class="hint">For humans</div>
+      <button data-exp="html">⬇ Self-contained .html</button>
+      <button data-exp="new">↻ Load another page</button>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="stage" id="stage">
+    <div class="frameWrap" id="frameWrap" style="width:1024px;height:720px">
+      <iframe id="frame" sandbox="allow-same-origin allow-scripts allow-forms allow-popups" title="Captured page"></iframe>
+      <div class="overlay" id="overlay"><div class="hl" id="hl"></div><div class="band" id="band"></div><button class="selbtn" id="selbtn">💬 Comment</button></div>
+    </div>
+  </div>
+  <aside class="side">
+    <div class="head"><h2>Feedback</h2><span class="count" id="count">0 items</span></div>
+    <div class="list" id="list"><div class="empty">No annotations yet.<br><b>Select text</b> to comment, or pick <b>Pin</b> / <b>Box</b> and click the page.</div></div>
+  </aside>
+</div>
+
+<div class="loader" id="loader">
+  <div class="panel">
+    <h1><svg class="mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="4.5" cy="5.5" r="2"/><circle cx="4.5" cy="18.5" r="2"/><path d="M6.4 6.5 11.5 9.4M6.4 17.5 11.5 14.6"/><rect x="11.5" y="7.5" width="10" height="9" rx="2.2"/><path d="M16.5 7.5V5"/><circle cx="16.5" cy="4.1" r="0.8" fill="currentColor" stroke="none"/><circle cx="15" cy="11.4" r="0.95" fill="currentColor" stroke="none"/><circle cx="18.5" cy="11.4" r="0.95" fill="currentColor" stroke="none"/><path d="M15 14.2h3.5"/></svg> Load a page to annotate</h1>
+    <p class="lead">ShareWithAgent annotates a frozen, self-contained snapshot of a web page — every comment anchors to a real DOM element, so a coding agent gets <i>"button .hero__cta, low contrast"</i>, not "something near (840,312)".</p>
+    <button class="opt" id="optDemo"><span class="ic">✨</span><span><b>Open the demo page</b><span>A sample pricing page — try it instantly.</span></span></button>
+    <button class="opt" id="optUpload"><span class="ic">📂</span><span><b>Upload a snapshot</b><span>A self-contained .html (e.g. from the ShareWithAgent extension or the “SingleFile” browser add-on).</span></span></button>
+    <label class="opt" for="urlField" id="optUrl" style="cursor:default"><span class="ic">🌐</span><span><b>Capture a live URL</b><span>Needs the ShareWithAgent extension or CLI (static site can’t render arbitrary pages). Paste a URL the extension will pick it up.</span><input type="url" id="urlField" placeholder="https://example.com/pricing" /></span></label>
+    <input type="file" id="fileInput" accept=".html,.htm,text/html" class="sr" />
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ---------- demo snapshot (self-contained) ---------- */
+const DEMO_SNAPSHOT = `<!doctype html><html><head><meta charset="utf-8"><style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,Segoe UI,Roboto,sans-serif}
+body{color:#0f172a;background:#fff}
+.nav{display:flex;align-items:center;justify-content:space-between;padding:18px 40px;border-bottom:1px solid #eef2f6}
+.nav .logo{font-weight:800;font-size:18px;color:#4f46e5}
+.nav a{margin-left:22px;color:#475569;text-decoration:none;font-size:14px}
+.hero{text-align:center;padding:70px 20px 40px}
+.hero h1{font-size:40px;letter-spacing:-.02em;margin-bottom:14px}
+.hero p{color:#64748b;font-size:17px;max-width:520px;margin:0 auto 26px}
+.hero__cta{display:inline-block;padding:8px 16px;background:#9ca3af;color:#cbd5e1;border-radius:8px;text-decoration:none;font-weight:600}
+.pricing{display:flex;gap:22px;justify-content:center;padding:30px 20px 80px;flex-wrap:wrap}
+.card{border:1px solid #e2e8f0;border-radius:16px;padding:28px;width:260px}
+.card--pro{border-color:#4f46e5;box-shadow:0 10px 40px rgba(79,70,229,.12)}
+.card h3{font-size:15px;text-transform:uppercase;letter-spacing:.04em;color:#64748b}
+.card .price{font-size:34px;font-weight:800;margin:10px 0}
+.card .price small{font-size:14px;color:#94a3b8;font-weight:500}
+.card ul{list-style:none;margin:16px 0;color:#475569;font-size:14px}
+.card li{padding:6px 0;border-bottom:1px solid #f1f5f9}
+.card button{width:100%;padding:11px;border:1px solid #4f46e5;background:#fff;color:#4f46e5;border-radius:9px;font-weight:600;cursor:pointer}
+.card--pro button{background:#4f46e5;color:#fff}
+.foot{text-align:center;padding:30px;color:#94a3b8;font-size:13px;border-top:1px solid #eef2f6}
+</style></head><body>
+<nav class="nav"><div class="logo">Acme</div><div><a href="#">Product</a><a href="#">Pricing</a><a href="#">Docs</a><a href="#">Sign in</a></div></nav>
+<section class="hero"><h1>Ship faster with Acme</h1><p>The all-in-one platform your team has been waiting for. Start free, scale when ready.</p><a class="hero__cta" href="#">Start free</a></section>
+<section class="pricing">
+<div class="card"><h3>Starter</h3><div class="price">$0<small>/mo</small></div><ul><li>1 project</li><li>Community support</li><li>1 GB storage</li></ul><button>Choose Starter</button></div>
+<div class="card card--pro"><h3>Pro</h3><div class="price">$29<small>/mo</small></div><ul><li>Unlimited projects</li><li>Priority support</li><li>100 GB storage</li><li>Advanced analytics</li></ul><button>Choose Pro</button></div>
+<div class="card"><h3>Team</h3><div class="price">$99<small>/mo</small></div><ul><li>Everything in Pro</li><li>SSO &amp; SAML</li><li>Audit logs</li></ul><button>Choose Team</button></div>
+</section>
+<footer class="foot">© Acme Inc · Privacy · Terms</footer>
+</body></html>`;
+
+/* ---------- state ---------- */
+const BRAND = 'ShareWithAgent';
+const VIEWPORTS = { desktop:{w:1024,h:720,label:'desktop-1024'}, mobile:{w:390,h:780,label:'mobile-390'} };
+let state = { tool:'select', viewport:'desktop', snapshot:'', pageUrl:'', annotations:[], selected:null, seq:0 };
+let cliReturn = null; // CLI/skill mode endpoint
+
+const $ = s => document.querySelector(s);
+const frame = $('#frame'), overlay = $('#overlay'), hl = $('#hl'), band = $('#band'), frameWrap = $('#frameWrap');
+
+/* ---------- boot ---------- */
+(function boot(){
+  document.getElementById('brandName').textContent = BRAND;
+  const params = new URLSearchParams(location.search);
+  cliReturn = params.get('return');               // e.g. /api/done  (CLI/skill mode)
+  if (cliReturn) { $('#sendBtn').style.display=''; }
+  if (params.get('demo')) { state.pageUrl='https://acme.example/pricing'; loadSnapshot(DEMO_SNAPSHOT); return; }
+  // restore from share link (#<lz>) if present
+  if (location.hash.length > 1) {
+    try {
+      const json = LZString.decompressFromEncodedURIComponent(location.hash.slice(1));
+      const data = JSON.parse(json);
+      if (data && data.snapshot) { hydrate(data); return; }
+    } catch(e){ /* ignore */ }
+  }
+  // CLI mode often injects the snapshot at /__snapshot.html — try fetching it
+  if (params.get('snapshot')) {
+    fetch(params.get('snapshot')).then(r=>r.text()).then(h=>{ state.pageUrl = params.get('url')||''; loadSnapshot(h); }).catch(()=>{});
+  }
+})();
+
+function hydrate(data){
+  state.snapshot = data.snapshot; state.pageUrl = data.url||''; state.viewport = data.viewport||'desktop';
+  state.annotations = (data.annotations||[]).map(a=>({...a}));
+  state.seq = state.annotations.length;
+  applyViewport(); $('#loader').classList.add('hidden');
+  frame.srcdoc = state.snapshot;
+  frame.addEventListener('load', ()=>{ wireFrame(); renderAll(); }, {once:true});
+}
+
+/* ---------- loaders ---------- */
+$('#optDemo').onclick = ()=>{ state.pageUrl='https://acme.example/pricing'; loadSnapshot(DEMO_SNAPSHOT); };
+$('#optUpload').onclick = ()=> $('#fileInput').click();
+$('#fileInput').onchange = e => { const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ state.pageUrl=f.name; loadSnapshot(r.result); }; r.readAsText(f); };
+$('#urlField').onkeydown = e => { if(e.key==='Enter'){ toast('Live capture needs the ShareWithAgent extension/CLI — see the homepage.'); } };
+
+function loadSnapshot(html){
+  state.snapshot = html;
+  applyViewport();
+  $('#loader').classList.add('hidden');
+  frame.srcdoc = html;
+  frame.addEventListener('load', ()=>{ wireFrame(); renderAll(); }, {once:true});
+}
+
+/* ---------- viewport ---------- */
+function applyViewport(){ const v=VIEWPORTS[state.viewport]; frameWrap.style.width=v.w+'px'; frameWrap.style.height=v.h+'px'; }
+$('#viewports').onclick = e => { const b=e.target.closest('button'); if(!b) return;
+  [...e.currentTarget.children].forEach(x=>x.classList.remove('on')); b.classList.add('on');
+  state.viewport=b.dataset.vw; applyViewport(); setTimeout(renderAll,200); };
+
+/* ---------- tools ---------- */
+$('#tools').onclick = e => { const b=e.target.closest('button'); if(!b) return; setTool(b.dataset.tool); };
+function setTool(t){ state.tool=t; [...$('#tools').children].forEach(x=>x.classList.toggle('on', x.dataset.tool===t));
+  const armed = t==='pin'||t==='box'||t==='hide';
+  overlay.classList.toggle('arming', armed); overlay.classList.toggle('hidemode', t==='hide');
+  if(!armed){ hl.style.display='none'; } }
+document.addEventListener('keydown', e=>{ if(e.target.matches('textarea,input')) return;
+  if(e.key==='v')setTool('select'); if(e.key==='p')setTool('pin'); if(e.key==='b')setTool('box'); if(e.key==='h')setTool('hide'); });
+
+/* ---------- frame wiring — all interaction runs on the (armed) overlay, hit-testing the
+   iframe via elementFromPoint. The overlay sits on top, so we can't rely on the iframe
+   receiving clicks; this keeps Pin, Box, Hide and the hover highlight all working. ---------- */
+function wireFrame(){
+  const doc = frame.contentDocument;
+  frame.contentWindow.addEventListener('scroll', renderAll, {passive:true});
+  let drag=null;
+  const pt = e => { const r=overlay.getBoundingClientRect(); const x=e.clientX-r.left, y=e.clientY-r.top; return {x, y, el:doc.elementFromPoint(x,y)}; };
+
+  overlay.addEventListener('mousemove', e=>{
+    if(state.tool==='select'){ hl.style.display='none'; return; }
+    if(drag && state.tool==='box'){ const r=overlay.getBoundingClientRect(); const x=e.clientX-r.left, y=e.clientY-r.top;
+      band.style.display='block'; band.style.left=Math.min(drag.x,x)+'px'; band.style.top=Math.min(drag.y,y)+'px';
+      band.style.width=Math.abs(x-drag.x)+'px'; band.style.height=Math.abs(y-drag.y)+'px'; hl.style.display='none'; return; }
+    const {el}=pt(e); if(!el || el===doc.documentElement || el===doc.body){ hl.style.display='none'; return; }
+    const r=el.getBoundingClientRect(); hl.style.display='block'; hl.style.left=r.left+'px'; hl.style.top=r.top+'px'; hl.style.width=r.width+'px'; hl.style.height=r.height+'px';
+  });
+  overlay.addEventListener('mouseleave', ()=>{ hl.style.display='none'; });
+  overlay.addEventListener('mousedown', e=>{ if(state.tool!=='box') return; e.preventDefault(); const {x,y}=pt(e); drag={x,y}; });
+  overlay.addEventListener('mouseup', e=>{
+    const {x,y,el}=pt(e);
+    if(state.tool==='pin'){ if(el) addPin(el); }
+    else if(state.tool==='hide'){ if(el && el!==doc.body && el!==doc.documentElement){ el.style.setProperty('display','none','important'); hl.style.display='none'; renderAll(); toast('Element hidden — click again for any leftover overlay'); } }
+    else if(state.tool==='box' && drag){ const box={x:Math.min(drag.x,x),y:Math.min(drag.y,y),w:Math.abs(x-drag.x),h:Math.abs(y-drag.y)};
+      band.style.display='none'; drag=null; if(box.w>=6 && box.h>=6) addBoxAt(box); }
+  });
+
+  // text selection → "Comment" button (Select mode; overlay isn't armed so the iframe gets the selection)
+  const selbtn = $('#selbtn');
+  let pendingSel = null;
+  doc.addEventListener('mouseup', ()=>{
+    if(state.tool!=='select') return;
+    setTimeout(()=>{
+      const sel = doc.getSelection(); const txt = sel && sel.toString().trim();
+      if(!txt || sel.isCollapsed){ selbtn.style.display='none'; pendingSel=null; return; }
+      const range = sel.getRangeAt(0); const r = range.getBoundingClientRect();
+      let el = range.commonAncestorContainer; if(el.nodeType!==1) el = el.parentElement;
+      pendingSel = { el, text: txt.slice(0,400) };
+      selbtn.style.display='block'; selbtn.style.left=Math.max(2, r.right-10)+'px'; selbtn.style.top=(r.bottom)+'px';
+    }, 0);
+  });
+  doc.addEventListener('mousedown', ()=>{ selbtn.style.display='none'; });
+  selbtn.onclick = ()=>{ if(!pendingSel) return; addSelectionNote(pendingSel.el, pendingSel.text);
+    selbtn.style.display='none'; try{ doc.getSelection().removeAllRanges(); }catch(e){} pendingSel=null; };
+}
+
+/* ---------- anchoring ---------- */
+function cssPath(el){
+  if(!el || el.nodeType!==1) return '';
+  if(el.id) return '#'+CSS.escape(el.id);
+  const parts=[];
+  while(el && el.nodeType===1 && el.tagName!=='BODY' && parts.length<6){
+    let sel=el.tagName.toLowerCase();
+    if(el.classList.length){ sel += '.'+[...el.classList].slice(0,2).map(c=>CSS.escape(c)).join('.'); }
+    const parent=el.parentElement;
+    if(parent){ const sib=[...parent.children].filter(c=>c.tagName===el.tagName);
+      if(sib.length>1) sel += `:nth-of-type(${sib.indexOf(el)+1})`; }
+    parts.unshift(sel); el=el.parentElement;
+  }
+  return parts.join(' > ');
+}
+function styleSubset(el){
+  const cs=frame.contentWindow.getComputedStyle(el); const keys=['display','padding','margin','color','background-color','font-size','font-weight','border','border-radius','width','height','line-height'];
+  const o={}; keys.forEach(k=>{ const v=cs.getPropertyValue(k); if(v) o[k]=v; }); return o;
+}
+function anchorFor(el){
+  const r=el.getBoundingClientRect();
+  return { selector:cssPath(el), boundingBox:{x:Math.round(r.left),y:Math.round(r.top+ (frame.contentWindow.scrollY||0)),w:Math.round(r.width),h:Math.round(r.height)},
+    elementHtml:(el.outerHTML||'').slice(0,400), text:(el.textContent||'').trim().slice(0,120), computedStyles:styleSubset(el) };
+}
+
+/* ---------- create annotations ---------- */
+function addPin(el){
+  const a={ id:'a'+(++state.seq), type:'pin', comment:'', status:'open', viewport:VIEWPORTS[state.viewport].label, anchor:anchorFor(el) };
+  state.annotations.push(a); state.selected=a.id; setTool('select'); renderAll(); focusComment(a.id);
+}
+function addSelectionNote(el, text){
+  const a={ id:'a'+(++state.seq), type:'text', comment:'', status:'open', viewport:VIEWPORTS[state.viewport].label, anchor:{...anchorFor(el), selectedText:text} };
+  state.annotations.push(a); state.selected=a.id; renderAll(); focusComment(a.id);
+}
+function addBoxAt(box){
+  const doc=frame.contentDocument;
+  const el = doc.elementFromPoint(box.x+box.w/2, box.y+box.h/2) || doc.body;
+  const a={ id:'a'+(++state.seq), type:'box', comment:'', status:'open', viewport:VIEWPORTS[state.viewport].label,
+    box:{x:Math.round(box.x),y:Math.round(box.y+(frame.contentWindow.scrollY||0)),w:Math.round(box.w),h:Math.round(box.h)}, anchor:anchorFor(el) };
+  state.annotations.push(a); state.selected=a.id; setTool('select'); renderAll(); focusComment(a.id);
+}
+
+/* ---------- render ---------- */
+function renderAll(){ renderOverlay(); renderList(); $('#count').textContent = state.annotations.length+' item'+(state.annotations.length===1?'':'s'); }
+function renderOverlay(){
+  [...overlay.querySelectorAll('.pin,.boxann,.inote')].forEach(n=>n.remove());
+  const sy = frame.contentWindow ? (frame.contentWindow.scrollY||0) : 0;
+  state.annotations.forEach((a,i)=>{
+    const bx = a.type==='box' ? a.box : a.anchor.boundingBox;
+    const px = bx.x + (a.type==='box'?0:bx.w/2), py = bx.y - sy;
+    if(a.type==='box'){ const d=document.createElement('div'); d.className='boxann'+(a.status==='resolved'?' resolved':'');
+      d.style.left=a.box.x+'px'; d.style.top=(a.box.y - sy)+'px'; d.style.width=a.box.w+'px'; d.style.height=a.box.h+'px';
+      d.onclick=()=>select(a.id); overlay.appendChild(d); }
+    const p=document.createElement('div'); p.className='pin'+(a.status==='resolved'?' resolved':'')+(a.id===state.selected?' sel':'');
+    p.style.left=px+'px'; p.style.top=py+'px'; p.textContent=i+1; p.onclick=()=>select(a.id); overlay.appendChild(p);
+    // inline comment bubble: editable for the selected pin, read-only chip for others that have a comment
+    if(a.id===state.selected){
+      const n=document.createElement('div'); n.className='inote'; n.dataset.id=a.id;
+      n.style.left=(px+18)+'px'; n.style.top=py+'px';
+      n.innerHTML=`${a.anchor.selectedText?`<div class="quote">“${esc(a.anchor.selectedText.slice(0,160))}”</div>`:''}<textarea placeholder="Describe the issue…">${esc(a.comment)}</textarea>
+        <div class="ia"><button data-a="resolve">${a.status==='resolved'?'Reopen':'Resolve'}</button><button data-a="del">Delete</button><button data-a="done" class="done">Done</button></div>`;
+      const ta=n.querySelector('textarea');
+      ta.oninput=()=>{ a.comment=ta.value; const sc=$(`.card[data-id="${a.id}"] textarea`); if(sc) sc.value=ta.value; };
+      n.querySelector('[data-a=resolve]').onclick=()=>{ a.status=a.status==='resolved'?'open':'resolved'; renderAll(); };
+      n.querySelector('[data-a=del]').onclick=()=>{ state.annotations=state.annotations.filter(x=>x.id!==a.id); state.selected=null; renderAll(); };
+      n.querySelector('[data-a=done]').onclick=()=>{ state.selected=null; renderAll(); };
+      overlay.appendChild(n);
+    } else if((a.comment||'').trim()){
+      const n=document.createElement('div'); n.className='inote chip'+(a.status==='resolved'?' resolved':''); n.dataset.id=a.id;
+      n.style.left=(px+18)+'px'; n.style.top=py+'px';
+      n.textContent=a.comment.trim().slice(0,90); n.onclick=()=>select(a.id); overlay.appendChild(n);
+    }
+  });
+}
+function renderList(){
+  const list=$('#list');
+  if(!state.annotations.length){ list.innerHTML='<div class="empty">No annotations yet.<br><b>Select text</b> to comment, or pick <b>Pin</b> / <b>Box</b> and click the page.</div>'; return; }
+  list.innerHTML='';
+  state.annotations.forEach((a,i)=>{
+    const c=document.createElement('div'); c.className='card'+(a.status==='resolved'?' resolved':'')+(a.id===state.selected?' sel':''); c.dataset.id=a.id;
+    c.innerHTML=`<div class="top"><span class="num">${i+1}</span><span class="sel-path" title="${esc(a.anchor.selector)}">${esc(a.anchor.selector)}</span></div>
+      ${a.anchor.selectedText?`<div class="quote">“${esc(a.anchor.selectedText.slice(0,160))}”</div>`:''}<textarea placeholder="Describe the issue…">${esc(a.comment)}</textarea>
+      <div class="meta"><span class="tag">${a.viewport}</span><span class="tag">${a.type}</span>
+        <div class="acts"><button data-act="resolve">${a.status==='resolved'?'Reopen':'Resolve'}</button><button data-act="del">Delete</button></div></div>`;
+    c.querySelector('textarea').oninput=e=>{ a.comment=e.target.value; const ie=overlay.querySelector(`.inote[data-id="${a.id}"] textarea`); if(ie) ie.value=e.target.value; };
+    c.querySelector('[data-act=resolve]').onclick=()=>{ a.status=a.status==='resolved'?'open':'resolved'; renderAll(); };
+    c.querySelector('[data-act=del]').onclick=()=>{ state.annotations=state.annotations.filter(x=>x.id!==a.id); renderAll(); };
+    c.querySelector('.top').onclick=()=>select(a.id);
+    list.appendChild(c);
+  });
+}
+function select(id){ state.selected=id; renderAll(); const card=$(`.card[data-id="${id}"]`); if(card) card.scrollIntoView({block:'nearest',behavior:'smooth'}); }
+function focusComment(id){ setTimeout(()=>{ const t=overlay.querySelector(`.inote[data-id="${id}"] textarea`); if(t){ t.focus(); } },60); }
+
+/* ---------- export ---------- */
+function buildPayload(){
+  return { tool:BRAND, version:'0.1', url:state.pageUrl, viewport:VIEWPORTS[state.viewport].label, capturedWith:cliReturn?'cli':'web', createdCount:state.annotations.length,
+    annotations: state.annotations.map((a,i)=>({ id:a.id, n:i+1, comment:a.comment, status:a.status, type:a.type, viewport:a.viewport,
+      anchor:a.anchor, ...(a.type==='box'?{box:a.box}:{}) })) };
+}
+function toMarkdown(){
+  const p=buildPayload(); let s=`# ${BRAND} feedback\n\n**Page:** ${p.url||'(uploaded snapshot)'}  ·  **Viewport:** ${p.viewport}  ·  **${p.annotations.length} item(s)**\n\n`;
+  p.annotations.forEach(a=>{ s+=`### ${a.n}. ${a.comment||'(no comment)'} ${a.status==='resolved'?'✅':''}\n`;
+    s+=`- **Element:** \`${a.anchor.selector}\`\n`;
+    if(a.anchor.selectedText) s+=`- **Selected text:** "${a.anchor.selectedText}"\n`;
+    else if(a.anchor.text) s+=`- **Text:** "${a.anchor.text}"\n`;
+    s+=`- **Box:** ${JSON.stringify(a.type==='box'?a.box:a.anchor.boundingBox)}\n`;
+    const st=a.anchor.computedStyles; const keys=Object.keys(st).slice(0,6);
+    if(keys.length) s+=`- **Styles:** ${keys.map(k=>`${k}: ${st[k]}`).join('; ')}\n`;
+    s+=`- **HTML:** \`${a.anchor.elementHtml.replace(/`/g,'')}\`\n\n`; });
+  return s;
+}
+function download(name, text, type='text/plain'){ const b=new Blob([text],{type}); const u=URL.createObjectURL(b); const a=document.createElement('a'); a.href=u; a.download=name; a.click(); URL.revokeObjectURL(u); }
+function shareLink(){ const data={snapshot:state.snapshot,url:state.pageUrl,viewport:state.viewport,annotations:state.annotations};
+  return location.origin+location.pathname+'#'+LZString.compressToEncodedURIComponent(JSON.stringify(data)); }
+function selfContainedHtml(){
+  const data={snapshot:state.snapshot,url:state.pageUrl,viewport:state.viewport,annotations:state.annotations};
+  // ship the current document with embedded data → opening it reconstructs the review
+  const docHtml=document.documentElement.outerHTML.replace(/<script id="embed">[\s\S]*?<\/script>/,'');
+  const inject=`<script id="embed">window.__EMBED__=${JSON.stringify(data)};addEventListener('DOMContentLoaded',()=>setTimeout(()=>{if(window.__EMBED__)hydrate(window.__EMBED__)},0));<\/script>`;
+  return '<!doctype html>'+docHtml.replace('</body>', inject+'</body>');
+}
+
+$('#exportToggle').onclick = e => { e.stopPropagation(); $('#exportMenu').classList.toggle('open'); };
+document.addEventListener('click', ()=> $('#exportMenu').classList.remove('open'));
+$('#exportMenu .pop').onclick = e => { const b=e.target.closest('button'); if(!b) return; const k=b.dataset.exp;
+  if(k==='json') download('feedback.json', JSON.stringify(buildPayload(),null,2), 'application/json');
+  if(k==='md') download('feedback.md', toMarkdown(), 'text/markdown');
+  if(k==='html') download('review.html', selfContainedHtml(), 'text/html');
+  if(k==='link'){ navigator.clipboard.writeText(shareLink()); toast('Share link copied to clipboard'); }
+  if(k==='new'){ location.href=location.pathname; }
+  $('#exportMenu').classList.remove('open');
+};
+$('#copyBtn').onclick = ()=>{ navigator.clipboard.writeText(toMarkdown()); toast('Markdown feedback copied — paste into your agent'); };
+
+/* ---------- CLI / skill return ---------- */
+$('#sendBtn').onclick = async ()=>{
+  try{ const res=await fetch(cliReturn, {method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify(buildPayload())});
+    if(res.ok){ toast('Sent to agent ✓ — you can close this tab'); $('#sendBtn').textContent='✓ Sent'; }
+    else toast('Send failed ('+res.status+')'); }
+  catch(e){ toast('Send failed — is the CLI still running?'); }
+};
+
+/* ---------- util ---------- */
+function esc(s){ return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+let toastT; function toast(m){ const t=$('#toast'); t.textContent=m; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),2600); }
+
+/* expose for embed-mode reopen */
+window.hydrate = hydrate;
+</script>
+</body>
+</html>

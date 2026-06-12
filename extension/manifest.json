@@ -1,0 +1,9 @@
+{
+  "manifest_version": 3,
+  "name": "ShareWithAgent — visual feedback for agents",
+  "version": "0.1.0",
+  "description": "Freeze the current page and annotate it; hand element-anchored feedback to your coding agent.",
+  "permissions": ["activeTab", "scripting"],
+  "host_permissions": ["<all_urls>"],
+  "action": { "default_popup": "popup.html", "default_title": "ShareWithAgent" }
+}
