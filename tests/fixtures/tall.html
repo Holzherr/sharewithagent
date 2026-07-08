@@ -1,0 +1,25 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+  *{margin:0;box-sizing:border-box;font-family:system-ui,sans-serif}
+  header{position:fixed;top:0;left:0;right:0;height:56px;background:#4f46e5;color:#fff;
+    display:flex;align-items:center;padding:0 20px;z-index:1000}
+  main{padding:76px 24px 24px}
+  .tall{height:2400px;background:linear-gradient(#fff,#eef2ff)}
+  .scrollbox{height:200px;overflow:auto;border:1px solid #ccc;margin:20px 0;padding:12px}
+  .scrollbox p{margin:8px 0}
+  #target{padding:14px;background:#fde047;font-weight:700}
+  svg text{font:14px sans-serif}
+</style></head><body>
+  <header>Fixed Header</header>
+  <main>
+    <p id="top">Top of page.</p>
+    <div class="tall">
+      <p id="target">PINPOINT_TARGET text that must stay glued on scroll.</p>
+      <p id="selectme">SELECT_THIS_PHRASE for the text-selection test.</p>
+    </div>
+    <div class="scrollbox"><p>Inner A</p><p>Inner B</p><p id="inner">INNER_SCROLL_TARGET</p>
+      <p style="height:400px">spacer</p></div>
+    <svg width="200" height="80"><g><rect width="200" height="80" fill="#ddd"/>
+      <text x="4" y="74">SVG_NODE_LABEL</text></g></svg>
+    <p style="height:600px">bottom spacer</p>
+  </main>
+</body></html>

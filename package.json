@@ -1,0 +1,49 @@
+{
+  "name": "sharewithagent",
+  "version": "0.1.0",
+  "description": "Visual feedback your coding agent can act on — capture any web page, point at elements, and hand your agent element-anchored comments (CSS selector + bounding box + element HTML + computed styles), not \"something near (840, 312).\"",
+  "type": "module",
+  "bin": {
+    "sharewithagent": "./cli.mjs",
+    "swa": "./cli.mjs"
+  },
+  "files": [
+    "cli.mjs",
+    "capture.mjs",
+    "viewer.html",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "annotate": "node cli.mjs annotate",
+    "test": "playwright test"
+  },
+  "keywords": [
+    "visual-feedback",
+    "annotation",
+    "coding-agent",
+    "ai-agent",
+    "code-review",
+    "dom",
+    "cli"
+  ],
+  "homepage": "https://sharewithagent.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Holzherr/sharewithagent.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Holzherr/sharewithagent/issues"
+  },
+  "author": "Nick Holzherr",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "single-file-cli": "^2.0.73"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}

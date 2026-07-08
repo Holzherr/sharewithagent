@@ -1,1 +1,5 @@
-.DS_Store
+node_modules/
+test-results/
+shots/
+feedback.json
+feedback.md
