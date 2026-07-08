@@ -183,6 +183,8 @@
       document.getElementById('bmlet').setAttribute('href',
         "javascript:(function(){if(window.__swabLoaded){return;}var s=document.createElement('script');s.src='https://sharewithagent.com/bookmarklet/overlay.js?v='+Date.now();document.body.appendChild(s);})();");
       document.getElementById('bmlet').addEventListener('click',function(e){e.preventDefault();alert('Drag this button up to your bookmarks bar — then click it on any page you want to annotate.');});
+      // Hosted capture endpoint (Cloudflare Worker — Browser Rendering).
+      window.SWA_CAPTURE_ENDPOINT = "https://sharewithagent-capture.nickholzherr.workers.dev";
       // Hosted form appears only when a capture endpoint is configured.
       if (window.SWA_CAPTURE_ENDPOINT) {
         var f=document.getElementById('hostedForm'); f.style.display='flex';
