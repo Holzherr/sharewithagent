@@ -137,19 +137,65 @@
 
 <div class="wrap">
   <section id="how">
-    <div class="sec-h"><h2>Three steps to feedback an agent understands</h2><p>No screenshots. A frozen, interactive DOM snapshot — so every pin carries a real selector.</p></div>
-    <div class="steps">
-      <div class="step"><div class="n">1</div><h3>Capture</h3><p>Extension or <code class="mono">npx sharewithagent</code> freezes the page exactly as you see it — logged in, JS-rendered, fonts and all — into one self-contained file.</p></div>
-      <div class="step"><div class="n">2</div><h3>Annotate</h3><p>Drop pins, draw boxes, write comments. Or (soon) just talk while you click around and let ShareWithAgent transcribe and anchor it.</p></div>
-      <div class="step"><div class="n">3</div><h3>Hand off</h3><p>Export structured JSON + a markdown digest. As a CLI/skill it streams straight back into your agent’s session — no copy-paste.</p></div>
+    <div class="sec-h"><h2>Four ways to use it — pick the one that fits</h2><p>However you start, you get the same thing back: every comment anchored to a real DOM element (CSS selector + box + element HTML + styles), plus a prompt-ready Markdown digest.</p></div>
+    <style>
+      .ways{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+      .way{border:1px solid var(--line);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:8px}
+      .way h3{margin:0;font-size:16px;display:flex;align-items:center;gap:8px}
+      .way .tag{font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;background:#eef2ff;color:var(--accent)}
+      .way .tag.soon{background:#fef3c7;color:#92400e}
+      .way p{margin:0;color:var(--sub);font-size:14px}
+      .way .cmd{display:flex;gap:8px;align-items:center;background:#0f172a;border-radius:9px;padding:8px 10px;margin-top:2px}
+      .way .cmd code{color:#e2e8f0;font-size:12.5px;font-family:ui-monospace,Menlo,monospace;overflow:auto;white-space:nowrap}
+      .way .cmd button{margin-left:auto;border:0;background:#334155;color:#fff;border-radius:6px;padding:4px 9px;font-size:11px;cursor:pointer;flex:none}
+      .dragbm{align-self:flex-start;background:var(--accent);color:#fff;text-decoration:none;font-weight:600;font-size:14px;padding:9px 15px;border-radius:9px;cursor:grab;border:0;display:inline-flex;gap:7px;align-items:center}
+      .dragbm:active{cursor:grabbing}
+      .hint-sm{font-size:12px;color:var(--mut)}
+      @media (max-width:760px){.ways{grid-template-columns:1fr}}
+    </style>
+    <div class="ways">
+      <div class="way">
+        <h3>💻 Terminal <span class="tag">for devs + agents</span></h3>
+        <p>Capture any page, annotate in your browser, and stream feedback straight back into your coding agent's session.</p>
+        <div class="cmd"><code>npx sharewithagent annotate https://your.app</code><button onclick="navigator.clipboard.writeText('npx sharewithagent annotate https://your.app');this.textContent='✓'">Copy</button></div>
+        <p class="hint-sm">Alias <code class="mono">swa</code>. Add <code class="mono">--json</code> to pipe the payload to an agent/hook.</p>
+      </div>
+      <div class="way">
+        <h3>🔖 Bookmarklet <span class="tag">no install</span></h3>
+        <p>Drag this to your bookmarks bar, then click it on any page to mark it up — nothing to install.</p>
+        <a class="dragbm" id="bmlet" href="#">⤵ Share with Agent</a>
+        <p class="hint-sm">Drag the button up to your bookmarks bar. (Sites with a strict Content-Security-Policy block it — use the extension there.)</p>
+      </div>
+      <div class="way">
+        <h3>🧩 Browser extension <span class="tag">one click, any page</span></h3>
+        <p>Click the toolbar icon on any page — it freezes the page exactly as you see it (logged-in, JS-rendered), then you annotate.</p>
+        <a class="btn" style="align-self:flex-start;padding:8px 14px" href="./sharewithagent-extension.zip" download>⬇ Download extension</a>
+        <p class="hint-sm">Chrome/Edge: unzip → <code class="mono">chrome://extensions</code> → Developer mode → Load unpacked.</p>
+      </div>
+      <div class="way">
+        <h3>🌐 Hosted — paste a URL <span class="tag soon">self-host</span></h3>
+        <p>Paste a public URL and get the annotator, nothing to run. The capture service is built + SSRF-hardened; a public instance isn't live yet — <a href="https://github.com/Holzherr/sharewithagent/blob/main/hosted/deploy.md">self-host it</a> in the meantime.</p>
+        <form id="hostedForm" style="display:none;gap:8px;margin-top:2px"><input id="hostedUrl" type="url" placeholder="https://example.com" style="flex:1;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px"><button class="btn primary" style="padding:8px 14px" type="submit">Capture</button></form>
+      </div>
     </div>
+    <script>
+      // Bookmarklet: injects the hosted overlay onto the current page.
+      document.getElementById('bmlet').setAttribute('href',
+        "javascript:(function(){if(window.__swabLoaded){return;}var s=document.createElement('script');s.src='https://sharewithagent.com/bookmarklet/overlay.js?v='+Date.now();document.body.appendChild(s);})();");
+      document.getElementById('bmlet').addEventListener('click',function(e){e.preventDefault();alert('Drag this button up to your bookmarks bar — then click it on any page you want to annotate.');});
+      // Hosted form appears only when a capture endpoint is configured.
+      if (window.SWA_CAPTURE_ENDPOINT) {
+        var f=document.getElementById('hostedForm'); f.style.display='flex';
+        f.addEventListener('submit',async function(e){e.preventDefault();var u=document.getElementById('hostedUrl').value;var b=f.querySelector('button');b.textContent='Capturing…';b.disabled=true;try{var r=await fetch(window.SWA_CAPTURE_ENDPOINT+'/api/capture',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({url:u})});var d=await r.json();if(d.viewer){location.href=window.SWA_CAPTURE_ENDPOINT+d.viewer;}else{alert(d.error||'Capture failed');}}catch(err){alert('Capture failed: '+err.message);}b.textContent='Capture';b.disabled=false;});
+      }
+    </script>
   </section>
 
   <section id="features">
     <div class="sec-h"><h2>What makes it different</h2></div>
     <div class="feat">
       <div class="f"><div class="ic">🎯</div><h3>Anchored to the DOM, not pixels</h3><p>Each note carries a CSS <code>selector</code>, bounding box, element HTML and computed styles. The agent knows <i>exactly</i> what you meant.</p></div>
-      <div class="f"><div class="ic">🧩</div><h3>Two surfaces, one engine</h3><p>A local CLI/skill (like plannotator) that returns feedback in-session — and a hosted website for sharing. Same viewer, same schema.</p></div>
+      <div class="f"><div class="ic">🧩</div><h3>Four surfaces, one engine</h3><p>Terminal, bookmarklet, browser extension, and a hosted page — all drive the same annotator and emit the same schema. Start however you like; your agent gets identical output.</p></div>
       <div class="f"><div class="ic">🔒</div><h3>Private by default</h3><p>Snapshots render on your machine. Share links live in the URL fragment — never sent to a server. Self-host the whole thing.</p></div>
       <div class="f"><div class="ic">🎙️</div><h3>Voice user-testing <span style="font-size:11px;color:var(--mut)">(soon)</span></h3><p>Speak aloud while you browse; an LLM pass turns the ramble into discrete, element-anchored usability issues.</p></div>
     </div>
