@@ -7,17 +7,14 @@
   p{font-size:12px;color:#64748b;margin:0 0 12px;line-height:1.4}
   button{width:100%;padding:10px;border:0;border-radius:9px;background:#4f46e5;color:#fff;font-weight:600;font-size:13px;cursor:pointer}
   button:hover{background:#4338ca}
-  .row{display:flex;gap:8px;margin-top:8px}
-  .row label{font-size:11px;color:#64748b;display:flex;align-items:center;gap:5px}
-  input{width:100%;font-size:11px;padding:6px;border:1px solid #e2e8f0;border-radius:6px;margin-top:8px}
+  button:disabled{background:#a5a6f0;cursor:default}
   .status{font-size:11px;color:#64748b;margin-top:10px;min-height:14px}
+  .status.error{color:#dc2626}
 </style></head>
 <body>
   <h1><svg class="mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="4.5" cy="5.5" r="2"/><circle cx="4.5" cy="18.5" r="2"/><path d="M6.4 6.5 11.5 9.4M6.4 17.5 11.5 14.6"/><rect x="11.5" y="7.5" width="10" height="9" rx="2.2"/><path d="M16.5 7.5V5"/><circle cx="16.5" cy="4.1" r="0.8" fill="currentColor" stroke="none"/><circle cx="15" cy="11.4" r="0.95" fill="currentColor" stroke="none"/><circle cx="18.5" cy="11.4" r="0.95" fill="currentColor" stroke="none"/><path d="M15 14.2h3.5"/></svg> ShareWithAgent</h1>
   <p>Freeze this page as-you-see-it and open it in the annotator. Element-anchored, agent-ready.</p>
-  <button id="cap">📸 Capture &amp; annotate this page</button>
-  <input id="viewer" value="https://sharewithagent.com/app.html" />
+  <button id="cap">Freeze &amp; annotate this page</button>
   <div class="status" id="status"></div>
-  <script src="lib/lz-string.min.js"></script>
   <script src="popup.js"></script>
 </body></html>

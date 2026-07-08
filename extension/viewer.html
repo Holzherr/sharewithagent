@@ -1,0 +1,1386 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ShareWithAgent — annotate · v0.1</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234f46e5' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><circle cx='4.5' cy='5.5' r='2'/><circle cx='4.5' cy='18.5' r='2'/><path d='M6.4 6.5 11.5 9.4M6.4 17.5 11.5 14.6'/><rect x='11.5' y='7.5' width='10' height='9' rx='2.2'/><path d='M16.5 7.5V5'/></svg>" />
+<script src="lib/lz-string.min.js"></script>
+<style>
+  :root { --ink:#0f172a; --sub:#64748b; --line:#e2e8f0; --accent:#4f46e5; --accent2:#6366f1; --bg:#f8fafc; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; color:var(--ink); background:var(--bg); }
+  body { display:flex; flex-direction:column; }
+  button { font-family:inherit; cursor:pointer; }
+
+  .ti { width:15px; height:15px; flex:0 0 auto; }
+
+  /* main */
+  .main { flex:1; display:flex; min-height:0; position:relative; }
+  .stage { flex:1; position:relative; overflow:auto; background:#eef2f6 repeating-linear-gradient(45deg,transparent,transparent 9px,rgba(15,23,42,.015) 9px,rgba(15,23,42,.015) 18px); display:flex; justify-content:center; padding:22px; }
+  .frameWrap { position:relative; background:#fff; box-shadow:0 6px 30px rgba(15,23,42,.12); align-self:flex-start; transition:width .18s ease; }
+  .nosnap { display:none; flex:1; align-items:center; justify-content:center; text-align:center; color:var(--sub); font-size:14px; line-height:1.6; padding:40px; }
+  #clearOverlays { white-space:nowrap; }
+  iframe { display:block; border:0; width:100%; height:100%; background:#fff; }
+
+  /* feedback panel + bottom bar */
+  .bottombar { position:fixed; left:50%; bottom:18px; transform:translateX(-50%); display:flex; align-items:center; gap:6px; background:#fff; border:1px solid var(--line); border-radius:14px; padding:6px; box-shadow:0 8px 30px rgba(15,23,42,.18); z-index:60; }
+  .bottombar .grp { display:flex; gap:2px; }
+  .bottombar button { border:0; background:transparent; font:inherit; font-size:13px; color:var(--sub); padding:7px 11px; border-radius:9px; cursor:pointer; display:flex; align-items:center; gap:6px; }
+  .bottombar button.on { background:#eef2ff; color:var(--accent); font-weight:600; }
+  .bottombar button:hover { background:var(--bg); }
+  .bottombar .bbtn.primary { background:var(--accent); color:#fff; }
+  .bottombar .bsep { width:1px; align-self:stretch; background:var(--line); margin:3px 1px; }
+  .bottombar .menu { position:relative; }
+  .bottombar .menu .pop { position:absolute; right:0; bottom:calc(100% + 8px); background:#fff; border:1px solid var(--line); border-radius:12px; box-shadow:0 10px 30px rgba(15,23,42,.18); padding:5px; min-width:230px; display:none; }
+  .bottombar .menu.open .pop { display:block; }
+  .bottombar .menu .pop .hint { font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:var(--sub); padding:6px 8px 3px; }
+  .bottombar .menu .pop button { display:block; width:100%; text-align:left; border:0; background:transparent; font:inherit; font-size:13px; color:var(--ink); padding:8px 10px; border-radius:7px; cursor:pointer; }
+  .bottombar .menu .pop button:hover { background:var(--bg); }
+  .panel { position:absolute; top:0; right:0; bottom:0; width:340px; background:#fff; border-left:1px solid var(--line); box-shadow:-8px 0 26px rgba(15,23,42,.10); transform:translateX(100%); transition:transform .22s ease; z-index:55; display:flex; flex-direction:column; }
+  .panel.open { transform:translateX(0); }
+  .panel.sheet { top:auto; left:0; right:0; bottom:0; width:auto; height:55%; transform:translateY(100%); border-left:0; border-top:1px solid var(--line); box-shadow:0 -8px 26px rgba(15,23,42,.12); }
+  .panel.sheet.open { transform:translateY(0); }
+  .panel .phead { padding:12px 14px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:8px; }
+  .panel .phead h2 { margin:0; font-size:13px; font-weight:700; }
+  .panel .phead .count { font-size:11px; color:var(--sub); font-weight:500; }
+  .panel .phead .who { margin-left:auto; font-size:11px; color:var(--sub); }
+  .panel .pclose { border:0; background:transparent; font-size:18px; color:var(--sub); cursor:pointer; }
+  .list { flex:1; overflow:auto; padding:10px; display:flex; flex-direction:column; gap:9px; min-width:0; }
+  .empty { color:var(--sub); font-size:13px; text-align:center; padding:34px 18px; line-height:1.5; }
+  .card { border:1px solid var(--line); border-radius:11px; padding:11px; background:#fff; }
+  .card.sel { border-color:var(--accent); box-shadow:0 0 0 3px rgba(79,70,229,.1); }
+  .card .top { display:flex; align-items:center; gap:8px; margin-bottom:7px; min-width:0; }
+  .card .num { width:20px; height:20px; border-radius:50%; background:var(--accent); color:#fff; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; flex:0 0 auto; }
+  .card .sel-path { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px; color:var(--sub); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; }
+  .quote { font-size:11.5px; color:var(--ink); background:#fafaff; border-left:3px solid var(--accent2); border-radius:0 6px 6px 0; padding:5px 8px; margin-bottom:6px; line-height:1.4; }
+  /* inline selection composer (replaces the old floating toolbar) */
+  #composer{position:absolute;z-index:70;width:320px;background:#fff;border:1px solid var(--line);border-radius:14px;
+    box-shadow:0 12px 34px -8px rgba(15,23,42,.30);padding:14px}
+  #composer .x{position:absolute;top:8px;right:8px;border:0;background:transparent;color:var(--muted,#64748b);font-size:15px;cursor:pointer;width:28px;height:28px;border-radius:8px}
+  #composer .x:hover{background:#f1f5f9}
+  #composer textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 11px;font:inherit;resize:none;min-height:66px;outline:none}
+  #composer textarea:focus{border-color:var(--accent,#4f46e5);box-shadow:0 0 0 3px rgba(79,70,229,.14)}
+  #composer .row{display:flex;justify-content:flex-end;margin-top:10px}
+  #composer .primary{border:0;background:var(--accent,#4f46e5);color:#fff;font-weight:600;font-size:13px;padding:9px 16px;border-radius:9px;cursor:pointer}
+  #composer .primary:disabled{opacity:.45;cursor:default}
+  #composer .primary .k{font-size:10px;opacity:.75;margin-left:4px}
+  .card textarea { width:100%; border:1px solid var(--line); border-radius:8px; padding:8px; font-size:13px; font-family:inherit; resize:vertical; min-height:46px; color:var(--ink); }
+  .card textarea:focus { outline:none; border-color:var(--accent); }
+  .card .meta { display:flex; gap:6px; margin-top:7px; flex-wrap:wrap; align-items:center; }
+  .tag { font-size:10px; padding:2px 7px; border-radius:999px; background:var(--bg); color:var(--sub); border:1px solid var(--line); }
+  .card.draft{ border-color:var(--accent); }
+  .card .thread{ margin:6px 0 0; }
+  .card .rep{ font-size:11.5px; color:#334155; padding:4px 0; border-top:1px solid #f1f5f9; }
+  .card .rep b{ color:#0f172a; }
+  .card .replybtn{ margin-top:6px; border:0; background:transparent; color:var(--accent); font-size:11px; cursor:pointer; padding:2px 0; }
+  .card .replybox textarea{ width:100%; border:1px solid var(--line); border-radius:7px; padding:6px; font:inherit; font-size:12px; margin-top:4px; min-height:36px; }
+  .card .replybox button{ margin-top:4px; border:0; background:var(--accent); color:#fff; font-size:11px; padding:4px 10px; border-radius:6px; cursor:pointer; }
+  .card.collapsed .col{display:flex;align-items:center;gap:9px;padding:11px 13px;cursor:pointer}
+  .card .col .num{background:var(--accent,#4f46e5);color:#fff;font:700 11px/1;border-radius:999px;min-width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;flex:none}
+  .card .col .who{font-weight:600;font-size:13px;flex:none}
+  .card .col .snip{color:var(--muted,#64748b);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+  .card .col .rc{font-size:11px;color:var(--muted,#64748b);background:#f1f5f9;border-radius:999px;padding:2px 7px;flex:none}
+  .card .exp{padding:12px}
+  .card .exp .top{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .card .more{margin-left:auto;position:relative}
+  .card .dots{border:0;background:transparent;color:var(--muted,#64748b);cursor:pointer;font-size:16px;width:28px;height:28px;border-radius:8px}
+  .card .dots:hover{background:#f1f5f9}
+  .card .menu{position:absolute;right:0;top:30px;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 34px -8px rgba(15,23,42,.30);padding:5px;z-index:5;min-width:132px}
+  .card .menu button{display:flex;width:100%;gap:8px;border:0;background:transparent;padding:8px 10px;border-radius:7px;cursor:pointer;font:13px/1 inherit}
+  .card .menu button:hover{background:#f1f5f9}
+  .card .menu .danger{color:#dc2626}
+  .card .row{display:flex;align-items:center;margin-top:9px}
+  .card .row .sp{flex:1}
+  .card .row .primary{border:0;background:var(--accent,#4f46e5);color:#fff;font-weight:600;font-size:13px;padding:8px 15px;border-radius:9px;cursor:pointer}
+  .card .row .ghost{border:0;background:transparent;color:var(--muted,#64748b);font-size:15px;width:30px;height:30px;border-radius:8px;cursor:pointer}
+  .card .meta{margin-top:8px;font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.02em;display:flex;gap:6px}
+
+  /* loader */
+  .loader { position:absolute; inset:0; background:rgba(248,250,252,.96); z-index:100; display:flex; align-items:center; justify-content:center; }
+  .loader.hidden { display:none; }
+  .loader .panel { position:static; transform:none; box-shadow:0 12px 50px rgba(15,23,42,.16); width:min(460px,92vw); height:auto; background:#fff; border:1px solid var(--line); border-radius:16px; padding:26px; }
+  .loader .panel h1 { margin:0 0 4px; font-size:18px; display:flex; align-items:center; gap:9px; }
+  .loader .panel p.lead { margin:0 0 18px; color:var(--sub); font-size:13px; line-height:1.5; }
+  .opt { display:flex; gap:11px; align-items:flex-start; padding:12px; border:1px solid var(--line); border-radius:11px; margin-bottom:9px; cursor:pointer; background:#fff; text-align:left; width:100%; }
+  .opt:hover { border-color:var(--accent); background:#fbfbff; }
+  .opt .ic { font-size:19px; flex:0 0 auto; }
+  .opt b { display:block; font-size:13px; }
+  .opt span { font-size:12px; color:var(--sub); }
+  .opt input[type=url] { margin-top:6px; width:100%; border:1px solid var(--line); border-radius:7px; padding:6px 8px; font-size:12px; }
+  .toast { position:fixed; bottom:76px; left:50%; transform:translateX(-50%); background:var(--ink); color:#fff; padding:10px 16px; border-radius:10px; font-size:13px; z-index:200; opacity:0; transition:opacity .2s; pointer-events:none; }
+  .toast.show { opacity:1; }
+  .sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
+  #identity{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:60;display:flex;align-items:center;gap:8px;
+    background:#fff;border:1px solid var(--line);border-radius:999px;padding:6px 10px 6px 14px;box-shadow:0 2px 10px -2px rgba(15,23,42,.14);font-size:13px}
+  #identity .lbl{color:var(--muted,#64748b)}
+  #identity input{border:1px solid var(--accent,#4f46e5);border-radius:8px;padding:5px 9px;font:inherit;width:150px;outline:none}
+  #identity button{border:0;background:var(--accent,#4f46e5);color:#fff;border-radius:8px;padding:6px 12px;font:inherit;font-weight:600;cursor:pointer}
+  #identity #identityEdit{background:#f1f5f9;color:var(--muted,#64748b);width:28px;height:28px;padding:0}
+  #identity.flag input{box-shadow:0 0 0 3px rgba(220,38,38,.28)}
+  #identity.flag{animation:swaShake .4s ease}
+  @keyframes swaShake{0%,100%{transform:translateX(-50%)}25%{transform:translateX(calc(-50% - 7px))}75%{transform:translateX(calc(-50% + 7px))}}
+  /* first-use coach hint */
+  #coach[hidden]{display:none}
+  #coach{position:fixed;left:50%;bottom:72px;transform:translateX(-50%);z-index:59;display:flex;align-items:center;gap:10px;
+    background:var(--ink,#0f172a);color:#fff;font-size:13px;padding:10px 8px 10px 16px;border-radius:12px;box-shadow:0 8px 30px rgba(15,23,42,.25);animation:coachIn .3s ease}
+  #coach b{font-weight:600}
+  #coach button{border:0;background:transparent;color:#94a3b8;cursor:pointer;font-size:13px;width:26px;height:26px;border-radius:7px}
+  #coach button:hover{background:rgba(255,255,255,.12);color:#fff}
+  @keyframes coachIn{from{opacity:0;transform:translate(-50%,6px)}to{opacity:1;transform:translate(-50%,0)}}
+  /* draft card while its inline composer is open — live mirror, not a second editor */
+  .card .draftlive{font-size:13px;color:var(--sub);white-space:pre-wrap;min-height:20px;padding:2px 0}
+  .card .draftlive .placeholder{color:#b6bfd1;font-style:italic}
+</style>
+</head>
+<body>
+
+<div id="identity">
+  <span id="identityUnset"><span class="lbl">🖊️ Your name</span>
+    <input id="identityName" placeholder="e.g. Nick" autocomplete="off" />
+    <button id="identitySave">Save</button></span>
+  <span id="identitySet" hidden>Commenting as <b id="identityLabel"></b>
+    <button id="identityEdit" title="Edit name">✎</button></span>
+</div>
+
+<div class="main">
+  <div class="stage" id="stage">
+    <div class="frameWrap" id="frameWrap" style="width:1024px;height:720px">
+      <iframe id="frame" sandbox="allow-same-origin allow-scripts allow-forms allow-popups" title="Captured page"></iframe>
+    </div>
+    <div class="nosnap" id="nosnap"><div><div style="font-size:30px;margin-bottom:8px">🔗🤖</div><b>Annotations-only link</b><br>The page snapshot isn’t embedded (keeps the link tiny). The feedback is in the panel.<br><span style="font-size:12px">For the full visual review, use the <b>.html</b> export instead.</span></div></div>
+  </div>
+  <aside class="panel" id="panel">
+    <div class="phead"><h2>Comments <span class="count" id="count">0</span></h2>
+      <button class="pclose" id="panelClose" title="Close (Esc)">×</button></div>
+    <div class="list" id="list"><div class="empty">No comments yet.<br><b>Select</b> text or <b>Pin</b> an element — a comment box opens right where you click.</div></div>
+  </aside>
+</div>
+
+<div class="bottombar" id="bottombar">
+  <div class="grp" id="tools">
+    <button data-tool="select" class="on" title="Select text to comment on (V)">⌖ Select</button>
+    <button data-tool="pin" title="Click an element to comment on (P)">✎ Pin</button>
+  </div>
+  <span class="bsep"></span>
+  <div class="grp" id="viewports">
+    <button data-vw="desktop" class="on" title="Desktop width (1024px)">🖥</button>
+    <button data-vw="mobile" title="Mobile width (390px)">📱</button>
+  </div>
+  <span class="bsep"></span>
+  <button class="bbtn" id="clearOverlays" title="Remove cookie banners / modal overlays">🍪</button>
+  <button class="bbtn" id="panelToggle" title="Comments panel (⌘.)">💬 <span id="ptCount">0</span></button>
+  <div class="menu" id="shareMenu">
+    <button class="bbtn primary" id="shareToggle">⤴ Share</button>
+    <div class="pop"></div>
+  </div>
+</div>
+
+<div id="coach" hidden><b>⌖ Select text</b> or <b>✎ Pin an element</b> — a comment box opens right there<button id="coachClose" title="Dismiss">✕</button></div>
+
+<div class="loader" id="loader">
+  <div class="panel">
+    <h1><svg class="mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="4.5" cy="5.5" r="2"/><circle cx="4.5" cy="18.5" r="2"/><path d="M6.4 6.5 11.5 9.4M6.4 17.5 11.5 14.6"/><rect x="11.5" y="7.5" width="10" height="9" rx="2.2"/><path d="M16.5 7.5V5"/><circle cx="16.5" cy="4.1" r="0.8" fill="currentColor" stroke="none"/><circle cx="15" cy="11.4" r="0.95" fill="currentColor" stroke="none"/><circle cx="18.5" cy="11.4" r="0.95" fill="currentColor" stroke="none"/><path d="M15 14.2h3.5"/></svg> Load a page to annotate</h1>
+    <p class="lead">ShareWithAgent annotates a frozen, self-contained snapshot of a web page — every comment anchors to a real DOM element, so a coding agent gets <i>"button .hero__cta, low contrast"</i>, not "something near (840,312)".</p>
+    <button class="opt" id="optDemo"><span class="ic">✨</span><span><b>Open the demo page</b><span>A sample pricing page — try it instantly.</span></span></button>
+    <button class="opt" id="optUpload"><span class="ic">📂</span><span><b>Upload a snapshot</b><span>A self-contained .html (e.g. from the ShareWithAgent extension or the “SingleFile” browser add-on).</span></span></button>
+    <label class="opt" for="urlField" id="optUrl" style="cursor:default"><span class="ic">🌐</span><span><b>Capture a live URL</b><span>Needs the ShareWithAgent extension or CLI (static site can’t render arbitrary pages). Paste a URL the extension will pick it up.</span><input type="url" id="urlField" placeholder="https://example.com/pricing" /></span></label>
+    <input type="file" id="fileInput" accept=".html,.htm,text/html" class="sr" />
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// Wrapped in an IIFE so every execution gets a fresh lexical scope. A self-contained
+// export, when reopened by a host that re-parses the document in the SAME JS realm
+// (e.g. document.write / setContent), re-runs this script; a fresh scope means the
+// top-level declarations below don't collide, DOM refs rebind to the live document,
+// and the parent message listener re-attaches. Any stale listener from a prior run
+// filters itself out via its `e.source !== frame.contentWindow` guard.
+(function(){
+/* ---------- demo snapshot (self-contained) ---------- */
+const DEMO_SNAPSHOT = `<!doctype html><html><head><meta charset="utf-8"><style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,Segoe UI,Roboto,sans-serif}
+body{color:#0f172a;background:#fff}
+.nav{display:flex;align-items:center;justify-content:space-between;padding:18px 40px;border-bottom:1px solid #eef2f6}
+.nav .logo{font-weight:800;font-size:18px;color:#4f46e5}
+.nav a{margin-left:22px;color:#475569;text-decoration:none;font-size:14px}
+.hero{text-align:center;padding:70px 20px 40px}
+.hero h1{font-size:40px;letter-spacing:-.02em;margin-bottom:14px}
+.hero p{color:#64748b;font-size:17px;max-width:520px;margin:0 auto 26px}
+.hero__cta{display:inline-block;padding:8px 16px;background:#9ca3af;color:#cbd5e1;border-radius:8px;text-decoration:none;font-weight:600}
+.pricing{display:flex;gap:22px;justify-content:center;padding:30px 20px 80px;flex-wrap:wrap}
+.card{border:1px solid #e2e8f0;border-radius:16px;padding:28px;width:260px}
+.card--pro{border-color:#4f46e5;box-shadow:0 10px 40px rgba(79,70,229,.12)}
+.card h3{font-size:15px;text-transform:uppercase;letter-spacing:.04em;color:#64748b}
+.card .price{font-size:34px;font-weight:800;margin:10px 0}
+.card .price small{font-size:14px;color:#94a3b8;font-weight:500}
+.card ul{list-style:none;margin:16px 0;color:#475569;font-size:14px}
+.card li{padding:6px 0;border-bottom:1px solid #f1f5f9}
+.card button{width:100%;padding:11px;border:1px solid #4f46e5;background:#fff;color:#4f46e5;border-radius:9px;font-weight:600;cursor:pointer}
+.card--pro button{background:#4f46e5;color:#fff}
+.foot{text-align:center;padding:30px;color:#94a3b8;font-size:13px;border-top:1px solid #eef2f6}
+</style></head><body>
+<nav class="nav"><div class="logo">Acme</div><div><a href="#">Product</a><a href="#">Pricing</a><a href="#">Docs</a><a href="#">Sign in</a></div></nav>
+<section class="hero"><h1>Ship faster with Acme</h1><p>The all-in-one platform your team has been waiting for. Start free, scale when ready.</p><a class="hero__cta" href="#">Start free</a></section>
+<section class="pricing">
+<div class="card"><h3>Starter</h3><div class="price">$0<small>/mo</small></div><ul><li>1 project</li><li>Community support</li><li>1 GB storage</li></ul><button>Choose Starter</button></div>
+<div class="card card--pro"><h3>Pro</h3><div class="price">$29<small>/mo</small></div><ul><li>Unlimited projects</li><li>Priority support</li><li>100 GB storage</li><li>Advanced analytics</li></ul><button>Choose Pro</button></div>
+<div class="card"><h3>Team</h3><div class="price">$99<small>/mo</small></div><ul><li>Everything in Pro</li><li>SSO &amp; SAML</li><li>Audit logs</li></ul><button>Choose Team</button></div>
+</section>
+<footer class="foot">© Acme Inc · Privacy · Terms</footer>
+</body></html>`;
+
+/* ---------- in-page annotation bridge (adapted from plannotator, MIT) ---------- */
+const ANNOTATION_CSS = `
+.swa-hl {
+  border-radius: 2px;
+  padding: 0 2px;
+  margin: 0 -2px;
+  cursor: pointer;
+}
+.swa-hl.deletion {
+  background: oklch(from var(--destructive, #c0392b) l c h / 0.35);
+  text-decoration: line-through;
+  text-decoration-color: var(--destructive, #c0392b);
+  text-decoration-thickness: 2px;
+}
+.swa-hl.comment {
+  background: oklch(0.70 0.18 60 / 0.3);
+  border-bottom: 2px solid var(--accent, #d97757);
+}
+.swa-hl.focused {
+  background: oklch(from var(--focus-highlight, #4493f8) l c h / 0.45) !important;
+  box-shadow: 0 0 8px oklch(from var(--focus-highlight, #4493f8) l c h / 0.4);
+  border-bottom: 2px solid var(--focus-highlight, #4493f8);
+  filter: none;
+}
+.swa-hl:hover {
+  filter: brightness(1.2);
+}
+.swa-pinpoint-hover {
+  outline: 2px solid var(--focus-highlight, #4493f8) !important;
+  outline-offset: 1px;
+  cursor: crosshair !important;
+}
+/* SVG nodes can't take a CSS outline — stroke their shapes instead. */
+.swa-pinpoint-hover rect, .swa-pinpoint-hover path,
+.swa-pinpoint-hover circle, .swa-pinpoint-hover ellipse, .swa-pinpoint-hover polygon {
+  stroke: var(--focus-highlight, #4493f8) !important; stroke-width: 2.5px !important;
+}
+`;
+
+/* Bridge script adapted from github.com/backnotprop/plannotator (MIT). */
+const BRIDGE_SCRIPT = `(function() {
+  var PREFIX = 'swa-bridge-';
+
+  // --- Theme ---
+  window.addEventListener('message', function(e) {
+    if (!e.data || e.data.type !== PREFIX + 'theme') return;
+    var root = document.documentElement;
+    var tokens = e.data.tokens;
+    for (var key in tokens) {
+      if (tokens.hasOwnProperty(key)) root.style.setProperty(key, tokens[key]);
+    }
+    root.classList.remove('light');
+    if (e.data.isLight) root.classList.add('light');
+  });
+
+  // --- Resize ---
+  var lastHeight = 0;
+  function postResize() {
+    if (!document.body) return;
+    var h = document.body.scrollHeight;
+    if (h !== lastHeight) {
+      lastHeight = h;
+      parent.postMessage({ type: PREFIX + 'resize', height: h }, '*');
+    }
+  }
+  window.addEventListener('load', postResize);
+
+  // --- Selection ---
+  var pendingSelection = null;
+  var pendingRange = null; // live range for the pending selection (scroll tracking)
+  var currentInputMethod = 'drag'; // 'drag' = text selection, 'pinpoint' = click an element
+  var pinpointHover = null;
+  // A plain click on an element-annotation target opens the toolbar, but the same
+  // click's mouseup schedules a handleSelection() that would see an empty selection
+  // and immediately clear it. This flag suppresses that one trailing clear.
+  var skipNextClear = false;
+
+  document.addEventListener('mouseup', function(e) {
+    if (currentInputMethod === 'pinpoint') return; // pinpoint uses click, not drag-select
+    if (e.target && e.target.closest && e.target.closest('.swa-hl')) return;
+    setTimeout(handleSelection, 10);
+  });
+
+  function handleSelection() {
+    var sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !sel.rangeCount) {
+      // Trailing clear from a plain-click element annotation — consume it once.
+      if (skipNextClear) { skipNextClear = false; return; }
+      if (pendingSelection) {
+        parent.postMessage({ type: PREFIX + 'selection-clear' }, '*');
+        pendingSelection = null;
+        pendingRange = null;
+      }
+      return;
+    }
+    skipNextClear = false; // a real text selection happened
+    var range = sel.getRangeAt(0);
+    var text = sel.toString().trim();
+    if (!text) return;
+
+    var rect = range.getBoundingClientRect();
+    pendingRange = range;
+    pendingSelection = {
+      text: text,
+      startContainerPath: getNodePath(range.startContainer),
+      startOffset: range.startOffset,
+      endContainerPath: getNodePath(range.endContainer),
+      endOffset: range.endOffset
+    };
+
+    var hostEl = range.commonAncestorContainer;
+    while (hostEl && hostEl.nodeType !== 1) hostEl = hostEl.parentNode;
+    parent.postMessage({
+      type: PREFIX + 'selection',
+      text: text,
+      rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
+      anchor: hostEl ? anchorFor(hostEl, text) : null
+    }, '*');
+  }
+
+  // Keep the toolbar/popover attached while the iframe content scrolls: re-post the
+  // pending selection's live rect (parent has no way to see an in-iframe scroll).
+  // Capture phase so inner scroll containers count too.
+  var scrollRaf = 0;
+  function postSelectionRect() {
+    scrollRaf = 0;
+    if (!pendingSelection || !pendingRange) return;
+    var r = pendingRange.getBoundingClientRect();
+    if (r.bottom < 0 || r.top > window.innerHeight) {
+      // Selection scrolled out of view — close the toolbar (matches markdown).
+      parent.postMessage({ type: PREFIX + 'selection-clear' }, '*');
+      return;
+    }
+    parent.postMessage({
+      type: PREFIX + 'selection-rect',
+      rect: { top: r.top, left: r.left, width: r.width, height: r.height }
+    }, '*');
+  }
+  window.addEventListener('scroll', function() {
+    if (!pendingSelection) return;
+    if (!scrollRaf) scrollRaf = requestAnimationFrame(postSelectionRect);
+  }, true);
+
+  // Keep the composer glued to the active mark through in-iframe reflow: scroll,
+  // in-iframe resize (viewport-preset toggles), and content-driven layout shifts.
+  // (Parent-window resize is handled parent-side — the iframe is fixed-width so
+  // these listeners never fire for it, but the frame re-centers there.)
+  // The mark whose composer is currently open. Set on create-mark, cleared on
+  // remove-mark / composer-closed — deliberately NOT repointed by focus-mark, so
+  // rail clicks on other cards can't silently stop the open composer's tracking.
+  var composerMarkId = null;
+  function postMarkRect(){
+    if (!composerMarkId) return;
+    var m = document.querySelector('mark.swa-hl[data-swa-id="' + composerMarkId + '"]');
+    if (!m) return; var r = m.getBoundingClientRect();
+    parent.postMessage({ type: PREFIX + 'mark-rect', id: composerMarkId,
+      rect: { top: r.top, left: r.left, width: r.width, height: r.height } }, '*');
+  }
+  var mrRaf = 0;
+  function scheduleMarkRect(){ if (!mrRaf) mrRaf = requestAnimationFrame(function(){ mrRaf = 0; postMarkRect(); }); }
+  window.addEventListener('scroll', scheduleMarkRect, true);
+  window.addEventListener('resize', scheduleMarkRect);
+  if (window.ResizeObserver) { try { new ResizeObserver(scheduleMarkRect).observe(document.body); } catch (e) {} }
+
+  // --- Mark Creation ---
+  window.addEventListener('message', function(e) {
+    if (!e.data || !e.data.type) return;
+    var type = e.data.type;
+
+    if (type === PREFIX + 'create-mark') {
+      var id = e.data.id;
+      var annType = e.data.annotationType || 'comment';
+      composerMarkId = id;
+      if (pendingSelection) {
+        // Text selections wrap a <mark>; element pinpoints (e.g. SVG nodes) carry
+        // no range, so there's no inline mark to apply — the annotation is still
+        // captured on the parent side from the posted text.
+        if (pendingSelection.startContainerPath) applyMark(id, annType, pendingSelection);
+        pendingSelection = null;
+        pendingRange = null;
+        window.getSelection().removeAllRanges();
+      }
+    }
+
+    else if (type === PREFIX + 'find-and-mark') {
+      var found = findTextAndMark(e.data.id, e.data.originalText, e.data.annotationType || 'comment');
+      parent.postMessage({
+        type: PREFIX + 'mark-applied',
+        id: e.data.id,
+        success: found
+      }, '*');
+    }
+
+    else if (type === PREFIX + 'remove-mark') {
+      removeMark(e.data.id);
+      if (composerMarkId === e.data.id) composerMarkId = null;
+    }
+
+    else if (type === PREFIX + 'composer-closed') {
+      if (e.data.id && composerMarkId === e.data.id) composerMarkId = null;
+    }
+
+    else if (type === PREFIX + 'clear-marks') {
+      var marks = document.querySelectorAll('.swa-hl[data-swa-id]');
+      for (var i = marks.length - 1; i >= 0; i--) unwrapMark(marks[i]);
+    }
+
+    else if (type === PREFIX + 'scroll-to') {
+      var mark = document.querySelector('[data-swa-id="' + e.data.id + '"]');
+      if (mark) {
+        mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        mark.classList.add('focused');
+        setTimeout(function() { mark.classList.remove('focused'); }, 2000);
+      }
+    }
+
+    else if (type === PREFIX + 'focus-mark') {
+      var all = document.querySelectorAll('.swa-hl');
+      for (var j = 0; j < all.length; j++) all[j].classList.remove('focused');
+      if (e.data.id) {
+        var target = document.querySelector('[data-swa-id="' + e.data.id + '"]');
+        if (target) target.classList.add('focused');
+      }
+    }
+
+    else if (type === PREFIX + 'set-input-method') {
+      currentInputMethod = e.data.method === 'pinpoint' ? 'pinpoint' : 'drag';
+      if (currentInputMethod !== 'pinpoint') {
+        if (pinpointHover) { pinpointHover.classList.remove('swa-pinpoint-hover'); pinpointHover = null; }
+        if (pinpointLabelEl) pinpointLabelEl.style.display = 'none';
+      }
+    }
+  });
+
+  // --- Pinpoint: hover to outline a whole element, click to select its text ---
+  // Reuses the normal selection pipeline — a pinpoint click just sets the iframe
+  // selection over the element's text, then runs handleSelection() like a drag.
+  var PINPOINT_SKIP = { SCRIPT: 1, STYLE: 1, NOSCRIPT: 1, HTML: 1, BODY: 1, HEAD: 1 };
+  var PINPOINT_INLINE = { A: 1, SPAN: 1, EM: 1, STRONG: 1, B: 1, I: 1, CODE: 1, SMALL: 1, LABEL: 1, MARK: 1, SUP: 1, SUB: 1, U: 1, ABBR: 1, TIME: 1 };
+
+  function resolvePinpointEl(node) {
+    var el = node;
+    while (el && el.nodeType === 3) el = el.parentNode; // text node -> parent
+    if (!el || el.nodeType !== 1) return null;
+    // SVG: a click on a shape/text leaf (rect, path, text) resolves to the whole
+    // node group, so clicking anywhere on an SVG node — not just its label — picks it.
+    if (el.ownerSVGElement && el.closest) {
+      var g = el.closest('g');
+      if (g && g.textContent && g.textContent.trim()) el = g;
+    }
+    if (PINPOINT_SKIP[el.tagName]) return null;
+    // Climb out of inline elements to their containing block.
+    while (el.parentElement && PINPOINT_INLINE[el.tagName] && !PINPOINT_SKIP[el.parentElement.tagName]) {
+      el = el.parentElement;
+    }
+    if (PINPOINT_SKIP[el.tagName]) return null;
+    if (!el.textContent || !el.textContent.trim()) return null; // need text to annotate
+    return el;
+  }
+
+  // Floating label naming the element under the cursor (like the markdown overlay).
+  var PINPOINT_LABELS = { H1:'Heading', H2:'Heading', H3:'Heading', H4:'Heading', H5:'Heading', H6:'Heading', P:'Paragraph', UL:'List', OL:'List', LI:'List item', A:'Link', BUTTON:'Button', IMG:'Image', TABLE:'Table', THEAD:'Table', TBODY:'Table', TR:'Row', TD:'Cell', TH:'Header cell', SECTION:'Section', NAV:'Navigation', HEADER:'Header', FOOTER:'Footer', ARTICLE:'Article', ASIDE:'Sidebar', BLOCKQUOTE:'Quote', PRE:'Code', CODE:'Code', FIGURE:'Figure', FIGCAPTION:'Caption', MAIN:'Main', FORM:'Form', INPUT:'Input', LABEL:'Label' };
+  var pinpointLabelEl = null;
+  function getPinpointLabelEl() {
+    if (!pinpointLabelEl) {
+      pinpointLabelEl = document.createElement('div');
+      pinpointLabelEl.setAttribute('data-swa-pinpoint-label', '');
+      pinpointLabelEl.style.cssText = 'position:fixed;z-index:2147483647;pointer-events:none;display:none;font:600 11px/1.3 system-ui,-apple-system,sans-serif;padding:2px 7px;border-radius:5px;background:var(--focus-highlight,#4493f8);color:#fff;white-space:nowrap;box-shadow:0 1px 5px rgba(0,0,0,.35);';
+      document.body.appendChild(pinpointLabelEl);
+    }
+    return pinpointLabelEl;
+  }
+  function hidePinpointLabel() { if (pinpointLabelEl) pinpointLabelEl.style.display = 'none'; }
+
+  document.addEventListener('mousemove', function(e) {
+    if (currentInputMethod !== 'pinpoint') return;
+    var el = resolvePinpointEl(e.target);
+    if (el !== pinpointHover) {
+      if (pinpointHover) pinpointHover.classList.remove('swa-pinpoint-hover');
+      pinpointHover = el;
+      if (el) el.classList.add('swa-pinpoint-hover');
+    }
+    if (!el) { hidePinpointLabel(); return; }
+    var r = el.getBoundingClientRect();
+    var lbl = getPinpointLabelEl();
+    lbl.textContent = PINPOINT_LABELS[el.tagName] || el.tagName.toLowerCase();
+    lbl.style.display = 'block';
+    var top = r.top - 22;
+    lbl.style.top = (top < 2 ? r.top + 2 : top) + 'px';
+    lbl.style.left = Math.max(2, r.left) + 'px';
+  });
+
+  // Pop the toolbar for a whole element: select its text if possible (so a <mark>
+  // can wrap it), else post its text + box directly so the toolbar still anchors
+  // (e.g. an SVG node, whose <text> doesn't select like HTML text).
+  function annotateElement(el) {
+    if (!el) return;
+    if (pinpointHover) { pinpointHover.classList.remove('swa-pinpoint-hover'); pinpointHover = null; }
+    hidePinpointLabel();
+    // SVG content can't hold an HTML <mark> wrapper — wrapping an SVG <text> in a
+    // <mark> un-renders it (the text disappears). So never text-wrap SVG: treat it
+    // as a whole-element annotation (post its text + box, no mark). HTML elements
+    // still try a real text selection first so a <mark> can highlight the words.
+    var txt = '';
+    if (!el.ownerSVGElement) {
+      try {
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        var range = document.createRange();
+        range.selectNodeContents(el);
+        sel.addRange(range);
+        txt = (sel.toString() || '').trim();
+      } catch (ex) {}
+    }
+    if (txt) { handleSelection(); return; }
+    var elText = (el.textContent || '').trim();
+    if (!elText) { parent.postMessage({ type: PREFIX + 'no-text' }, '*'); return; }
+    var r = el.getBoundingClientRect();
+    pendingSelection = { element: true };
+    pendingRange = null;
+    skipNextClear = true; // don't let this click's mouseup clear the toolbar we just opened
+    parent.postMessage({ type: PREFIX + 'selection', text: elText, element: true,
+      rect: { top: r.top, left: r.left, width: r.width, height: r.height },
+      anchor: anchorFor(el) }, '*');
+  }
+
+  document.addEventListener('click', function(e) {
+    if (currentInputMethod !== 'pinpoint') return;
+    // Existing marks are handled by the mark-click listener.
+    if (e.target && e.target.closest && e.target.closest('.swa-hl[data-swa-id]')) return;
+    var el = resolvePinpointEl(e.target);
+    if (!el) return;
+    // Suppress the page's own behavior (links, buttons) — we're annotating.
+    e.preventDefault();
+    e.stopPropagation();
+    annotateElement(el);
+  }, true);
+
+  // Author opt-in: a plain click on any element tagged [data-annotate] pops the
+  // toolbar — no pinpoint mode. Lets an HTML doc (e.g. a flow graph) wire its own
+  // nodes to the toolbar. Bubble phase so the page's own click handlers
+  // run first; an active text selection is respected, not clobbered.
+  document.addEventListener('click', function(e) {
+    if (currentInputMethod === 'pinpoint') return; // pinpoint handler covers this
+    var t = e.target && e.target.closest && e.target.closest('[data-annotate]');
+    if (!t) return;
+    if (e.target.closest('.swa-hl[data-swa-id]')) return;
+    var s = window.getSelection();
+    if (s && !s.isCollapsed && (s.toString() || '').trim()) return; // respect a drag-selection
+    annotateElement(t);
+  });
+
+  // --- Mark Click ---
+  document.addEventListener('click', function(e) {
+    var mark = e.target.closest ? e.target.closest('.swa-hl[data-swa-id]') : null;
+    if (mark) {
+      e.stopPropagation();
+      parent.postMessage({
+        type: PREFIX + 'mark-click',
+        id: mark.getAttribute('data-swa-id')
+      }, '*');
+    }
+  });
+
+  // --- Type-to-comment ---
+  // While a selection is pending, focus is inside this iframe, so the parent's
+  // toolbar keydown listener never sees the keystroke. Forward a single printable
+  // char to the parent so it can open a comment pre-filled with it.
+  document.addEventListener('keydown', function(e) {
+    if (!pendingSelection) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (!e.key || e.key.length !== 1) return; // single printable char only
+    e.preventDefault();
+    parent.postMessage({ type: PREFIX + 'keytype', key: e.key }, '*');
+    // Hand keyboard focus back to the parent window so the comment textarea can
+    // take it. Blurring the <iframe> from the parent isn't enough — the inner
+    // document keeps focus — so the iframe must relinquish it. parent.focus() is
+    // allowed cross-origin (like postMessage); also drop the active element.
+    try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch (ex) {}
+    try { parent.focus(); } catch (ex) {}
+  });
+
+  // --- Helpers ---
+
+  function cssPath(el) {
+    if (!el || el.nodeType !== 1) return '';
+    if (el.id) return '#' + (window.CSS && CSS.escape ? CSS.escape(el.id) : el.id);
+    var parts = [];
+    while (el && el.nodeType === 1 && el.tagName !== 'BODY' && parts.length < 6) {
+      var sel = el.tagName.toLowerCase();
+      if (el.classList && el.classList.length) {
+        var cls = [].slice.call(el.classList, 0, 2)
+          .map(function(c){ return window.CSS && CSS.escape ? CSS.escape(c) : c; }).join('.');
+        sel += '.' + cls;
+      }
+      var parent = el.parentElement;
+      if (parent) {
+        var sib = [].filter.call(parent.children, function(c){ return c.tagName === el.tagName; });
+        if (sib.length > 1) sel += ':nth-of-type(' + (sib.indexOf(el) + 1) + ')';
+      }
+      parts.unshift(sel); el = el.parentElement;
+    }
+    return parts.join(' > ');
+  }
+  function styleSubset(el) {
+    var cs = window.getComputedStyle(el);
+    var keys = ['display','padding','margin','color','background-color','font-size',
+      'font-weight','border','border-radius','width','height','line-height'];
+    var o = {}; for (var i = 0; i < keys.length; i++) {
+      var v = cs.getPropertyValue(keys[i]); if (v) o[keys[i]] = v; } return o;
+  }
+  // Serialize an element's HTML with our own instrumentation stripped — the
+  // agent must see the page's real markup, never the injected swa-hl wrappers.
+  function cleanElementHtml(el) {
+    var clone = el.cloneNode(true);
+    var marks = clone.querySelectorAll('mark.swa-hl');
+    for (var i = marks.length - 1; i >= 0; i--) {
+      var m = marks[i], p = m.parentNode;
+      while (m.firstChild) p.insertBefore(m.firstChild, m);
+      p.removeChild(m);
+    }
+    clone.normalize();
+    return clone.outerHTML || '';
+  }
+
+  function anchorFor(el, selectedText) {
+    var r = el.getBoundingClientRect();
+    var a = {
+      selector: cssPath(el),
+      boundingBox: { x: Math.round(r.left), y: Math.round(r.top + (window.scrollY || 0)),
+        w: Math.round(r.width), h: Math.round(r.height) },
+      elementHtml: cleanElementHtml(el).slice(0, 400),
+      text: (el.textContent || '').trim().slice(0, 120),
+      computedStyles: styleSubset(el)
+    };
+    if (selectedText) a.selectedText = selectedText.slice(0, 400);
+    return a;
+  }
+
+  function getNodePath(node) {
+    var path = [];
+    while (node && node !== document.body) {
+      if (node.parentNode) {
+        var siblings = node.parentNode.childNodes;
+        var idx = 0;
+        for (var i = 0; i < siblings.length; i++) {
+          if (siblings[i] === node) { idx = i; break; }
+        }
+        path.unshift(idx);
+      }
+      node = node.parentNode;
+    }
+    return path;
+  }
+
+  function applyMark(id, annType, selData) {
+    try {
+      var startNode = resolveNodePath(selData.startContainerPath);
+      var endNode = resolveNodePath(selData.endContainerPath);
+      if (!startNode || !endNode) return;
+
+      var range = document.createRange();
+      range.setStart(startNode, selData.startOffset);
+      range.setEnd(endNode, selData.endOffset);
+      wrapRangeInMarks(range, id, annType);
+    } catch (ex) { /* range may be stale */ }
+  }
+
+  function wrapRangeInMarks(range, id, annType) {
+    var walker = document.createTreeWalker(
+      range.commonAncestorContainer.nodeType === 1 ? range.commonAncestorContainer : range.commonAncestorContainer.parentNode,
+      NodeFilter.SHOW_TEXT,
+      null
+    );
+
+    var textNodes = [];
+    while (walker.nextNode()) {
+      if (range.intersectsNode(walker.currentNode)) {
+        textNodes.push(walker.currentNode);
+      }
+    }
+
+    for (var i = 0; i < textNodes.length; i++) {
+      var tn = textNodes[i];
+      var start = (tn === range.startContainer) ? range.startOffset : 0;
+      var end = (tn === range.endContainer) ? range.endOffset : tn.length;
+      if (start >= end) continue;
+      // Skip whitespace-only slices (inter-element text nodes) — wrapping them
+      // renders stray empty highlight stubs between lines.
+      if (!tn.textContent.substring(start, end).trim()) continue;
+
+      var markRange = document.createRange();
+      markRange.setStart(tn, start);
+      markRange.setEnd(tn, end);
+
+      var mark = document.createElement('mark');
+      mark.className = 'swa-hl ' + annType;
+      mark.setAttribute('data-swa-id', id);
+      markRange.surroundContents(mark);
+    }
+
+    var created = document.querySelector('[data-swa-id="' + id + '"]');
+    if (created) {
+      var host = created.parentElement || created;
+      var rr = created.getBoundingClientRect();
+      parent.postMessage({ type: PREFIX + 'mark-created', id: id,
+        rect: { top: rr.top, left: rr.left, width: rr.width, height: rr.height },
+        anchor: anchorFor(host) }, '*');
+    }
+  }
+
+  function findTextAndMark(id, originalText, annType) {
+    var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+    var buffer = '';
+    var nodes = [];
+    while (walker.nextNode()) {
+      nodes.push({ node: walker.currentNode, start: buffer.length });
+      buffer += walker.currentNode.textContent;
+    }
+    var idx = buffer.indexOf(originalText);
+    if (idx === -1) return false;
+
+    var endIdx = idx + originalText.length;
+    var slices = [];
+    for (var i = 0; i < nodes.length; i++) {
+      var entry = nodes[i];
+      var nodeEnd = entry.start + entry.node.length;
+      if (nodeEnd <= idx) continue;
+      if (entry.start >= endIdx) break;
+
+      var start = Math.max(0, idx - entry.start);
+      var end = Math.min(entry.node.length, endIdx - entry.start);
+      if (start >= end) continue;
+      // Skip whitespace-only slices — same stray-stub guard as wrapRangeInMarks.
+      if (!entry.node.textContent.substring(start, end).trim()) continue;
+      slices.push({ node: entry.node, start: start, end: end });
+    }
+    for (var j = slices.length - 1; j >= 0; j--) {
+      try {
+        var s = slices[j];
+        var markRange = document.createRange();
+        markRange.setStart(s.node, s.start);
+        markRange.setEnd(s.node, s.end);
+
+        var mark = document.createElement('mark');
+        mark.className = 'swa-hl ' + annType;
+        mark.setAttribute('data-swa-id', id);
+        markRange.surroundContents(mark);
+      } catch (ex) { /* node may have been mutated by a prior wrap */ }
+    }
+    var created = document.querySelector('[data-swa-id="' + id + '"]');
+    if (created) {
+      var host = created.parentElement || created;
+      var rr = created.getBoundingClientRect();
+      parent.postMessage({ type: PREFIX + 'mark-created', id: id,
+        rect: { top: rr.top, left: rr.left, width: rr.width, height: rr.height },
+        anchor: anchorFor(host) }, '*');
+    }
+    return slices.length > 0;
+  }
+
+  function removeMark(id) {
+    var marks = document.querySelectorAll('[data-swa-id="' + id + '"]');
+    for (var i = marks.length - 1; i >= 0; i--) unwrapMark(marks[i]);
+  }
+
+  function unwrapMark(mark) {
+    var parent = mark.parentNode;
+    while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+    parent.removeChild(mark);
+    parent.normalize();
+  }
+
+  function resolveNodePath(path) {
+    var node = document.body;
+    for (var i = 0; i < path.length; i++) {
+      if (!node.childNodes[path[i]]) return null;
+      node = node.childNodes[path[i]];
+    }
+    return node;
+  }
+
+  function onReady() {
+    if (typeof ResizeObserver !== 'undefined' && document.body) {
+      new ResizeObserver(postResize).observe(document.body);
+    }
+    parent.postMessage({ type: PREFIX + 'ready' }, '*');
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', onReady);
+  } else {
+    onReady();
+  }
+})();`;
+
+/* ---------- state ---------- */
+const BRAND = 'ShareWithAgent';
+const VIEWPORTS = { desktop:{w:1024,h:720,label:'desktop-1024'}, mobile:{w:390,h:780,label:'mobile-390'} };
+let state = { tool:'select', viewport:'desktop', snapshot:'', pageUrl:'', annotations:[], selected:null, expanded:null, seq:0, panelOpen:false,
+  commenterName: (()=>{ try{ return localStorage.getItem('swa.commenterName')||''; }catch(e){ return ''; } })() };
+let cliReturn = null; // CLI/skill mode endpoint
+
+const $ = s => document.querySelector(s);
+const frame = $('#frame'), frameWrap = $('#frameWrap');
+
+/* ---------- bridge: parent-side message handler ---------- */
+const BRIDGE = 'swa-bridge-';
+function postToFrame(msg) { try { frame.contentWindow.postMessage(msg, '*'); } catch (e) {} }
+
+window.addEventListener('message', e => {
+  if (e.source !== frame.contentWindow) return;            // only our iframe
+  if (!e.data || typeof e.data.type !== 'string' || !e.data.type.startsWith(BRIDGE)) return;
+  const t = e.data.type.slice(BRIDGE.length);
+
+  if (t === 'ready') {
+    window.__swaReady = true;
+    postToFrame({ type: BRIDGE + 'set-input-method', method: state.tool === 'pin' ? 'pinpoint' : 'drag' });
+    // Skip element-only annotations (SVG / no-text): they have no in-page <mark>,
+    // so a text walk would either no-op or wrongly wrap unrelated text.
+    state.annotations.forEach(a => { if (a.anchor && a.anchor.element) return;
+      postToFrame({ type: BRIDGE + 'find-and-mark',
+        id: a.id, originalText: a.anchor.selectedText || a.anchor.text, annotationType: 'comment' }); });
+    renderList();
+  }
+  else if (t === 'resize') { /* fixed-height frame: no-op */ }
+  else if (t === 'selection') {
+    if (state.tool === 'pin') {                 // pinpoint commits immediately
+      const id = 'a' + (++state.seq);
+      if (e.data.element) {
+        // SVG / non-text-wrappable element: no in-page <mark> possible — create the
+        // annotation directly from the posted anchor (the sidebar card is the index;
+        // no in-page highlight). Tag the anchor so reopen skips the text-walk re-mark.
+        const a = makePinAnnotation(id, { ...e.data.anchor, element: true });
+        state.annotations.push(a); state.selected = id; setPanel(true); renderList();
+        if (e.data.rect) openComposer({ rect: e.data.rect, id }); else focusComment(id);
+      } else {
+        postToFrame({ type: BRIDGE + 'create-mark', id, annotationType: 'comment' });
+      }
+    } else { // text-select → create draft immediately and open the inline composer
+      // A multi-click (dblclick/tripleclick) fires the bridge's mouseup handler once per
+      // click, re-posting the SAME already-settled selection each time (no intervening
+      // selection-clear) — without this guard each click would spawn its own duplicate
+      // draft + mark. If the already-open composer's draft is this exact same selection,
+      // just reposition it instead of creating another one.
+      const cur = composerId && state.annotations.find(x => x.id === composerId);
+      if (cur && cur.status === 'draft' && cur.type === 'text' && cur.anchor.selectedText === e.data.text && cur.anchor.selector === e.data.anchor.selector) {
+        positionComposer(e.data.rect);
+      } else {
+        const id = 'a' + (++state.seq);
+        const a = { id, type:'text', comment:'', status:'draft', viewport:VIEWPORTS[state.viewport].label,
+          anchor:{ ...e.data.anchor, selectedText: e.data.text } };
+        state.annotations.push(a); state.selected = id; setPanel(true);
+        postToFrame({ type: BRIDGE + 'create-mark', id, annotationType: 'comment' });
+        renderList(); openComposer({ rect: e.data.rect, id });
+      }
+    }
+  }
+  else if (t === 'no-text') { toast('Pinpoint a text element, or select text — bare images/icons aren’t supported yet'); }
+  else if (t === 'selection-rect') { if($('#composer')) positionComposer(e.data.rect); }
+  else if (t === 'mark-rect') {
+    if (composerId === e.data.id && $('#composer')) { lastComposerRect = e.data.rect; positionComposer(e.data.rect); }
+  }
+  else if (t === 'keytype') {
+    // A printable key was pressed inside the iframe before the composer won keyboard
+    // focus — route the character into the open composer so the first keystroke of
+    // type-to-comment is never swallowed.
+    const c = $('#composer'); if (!c) return;
+    const ta = c.querySelector('textarea');
+    ta.value += e.data.key;
+    ta.dispatchEvent(new Event('input'));   // reuses the input listener: comment sync + button enable
+    ta.focus(); const n = ta.value.length; ta.setSelectionRange(n, n);
+  }
+  else if (t === 'mark-created') { onMarkCreated(e.data.id, e.data.anchor, e.data.rect); }
+  else if (t === 'mark-click') { select(e.data.id); }
+  // (the bridge also posts 'selection-clear'; intentionally unhandled since the
+  // composer owns selection lifecycle now)
+});
+
+function makePinAnnotation(id, anchor) {
+  return { id, type: 'pin', comment: '', status: 'draft',
+    viewport: VIEWPORTS[state.viewport].label, anchor };
+}
+
+function onMarkCreated(id, anchor, rect) {
+  if (state.annotations.some(a => a.id === id)) return;
+  const a = makePinAnnotation(id, anchor);
+  state.annotations.push(a); state.selected = id; setPanel(true); renderList();
+  if (rect) openComposer({ rect, id }); else focusComment(id);
+}
+
+function positionComposer(rect){
+  const fr = frame.getBoundingClientRect(), c = $('#composer'); if(!c) return;
+  const w = 320, pad = 10;
+  let left = fr.left + rect.left, top = fr.top + rect.top + rect.height + 8;
+  if(left + w > window.innerWidth - pad) left = window.innerWidth - w - pad;
+  c.style.left = Math.max(pad, left) + 'px'; c.style.top = top + 'px';
+}
+
+let composerId = null;
+let lastComposerRect = null;
+function openComposer({ rect, id }){
+  if (composerId && composerId !== id) {
+    const prev = state.annotations.find(x => x.id === composerId);
+    if (prev && prev.status === 'draft' && !(prev.comment || '').trim()) cancelDraft(composerId);
+  }
+  closeComposer(); composerId = id; lastComposerRect = rect;
+  const c = document.createElement('div'); c.id = 'composer';
+  c.innerHTML =
+    '<button class="x" title="Cancel">✕</button>' +
+    '<textarea placeholder="Comment…"></textarea>' +
+    '<div class="row"><button class="primary" data-act="post" disabled>Comment <span class="k">⌘↵</span></button></div>';
+  document.body.appendChild(c);
+  positionComposer(rect);
+  const ta = c.querySelector('textarea'), post = c.querySelector('[data-act=post]');
+  const a = state.annotations.find(x=>x.id===id);
+  ta.value = a ? a.comment : ''; post.disabled = !ta.value.trim();
+  // Focus immediately so keystrokes land in the composer, not the iframe (the old
+  // 30ms delay swallowed fast typists' first character); retry once in case the
+  // iframe steals focus back during the same tick.
+  ta.focus(); setTimeout(()=>{ if(document.activeElement !== ta) ta.focus(); }, 60);
+  ta.addEventListener('input', ()=>{ if(a) a.comment = ta.value; post.disabled = !ta.value.trim(); syncCardText(id); });
+  ta.addEventListener('keydown', e=>{
+    if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){ e.preventDefault(); if(ta.value.trim()) saveAnnotation(id); }
+    else if(e.key==='Escape'){ e.preventDefault(); cancelDraft(id); }
+  });
+  post.onclick = ()=>{ if(ta.value.trim()) saveAnnotation(id); };
+  c.querySelector('.x').onclick = ()=> cancelDraft(id);
+  hideCoach(true);       // they've found the core interaction — retire the first-use hint
+  renderList();          // composerId is now set: the draft card renders as a live mirror
+}
+function closeComposer(){ const c=$('#composer'); const closing = composerId;
+  if(c) c.remove(); composerId=null;
+  // Stop the bridge's mark-rect traffic — but id-scoped: openComposer's internal close
+  // fires right after create-mark for the NEXT composer, and an unscoped clear would
+  // wipe the new mark's tracking (postMessage is FIFO: create-mark(new) then this).
+  if(closing) postToFrame({ type: BRIDGE + 'composer-closed', id: closing }); }
+// Parent-window resize: the iframe is fixed-width per viewport preset, so the
+// bridge's in-iframe listeners never fire — but #frameWrap re-centers, so the
+// composer must be re-positioned from the cached iframe-relative rect.
+window.addEventListener('resize', ()=>{ if($('#composer') && lastComposerRect) positionComposer(lastComposerRect); });
+// Same for scrolling the parent-side stage scrollbox (window smaller than the
+// viewport preset): scroll doesn't bubble, so listen capture-phase on window.
+window.addEventListener('scroll', ()=>{ if($('#composer') && lastComposerRect) positionComposer(lastComposerRect); }, true);
+function syncCardText(id){ // composer → rail card (live mirror while composing; textarea otherwise)
+  const a = state.annotations.find(x=>x.id===id); if(!a) return;
+  const card = $(`.card[data-id="${id}"]`); if(!card) return;
+  const live = card.querySelector('.draftlive');
+  if(live){ if(a.comment) live.textContent = a.comment; else live.innerHTML = '<span class="placeholder">Writing…</span>'; return; }
+  const t = card.querySelector('.exp > textarea');
+  if(t && t.value !== a.comment) t.value = a.comment;
+}
+function syncComposerText(id){ // rail card → composer (reverse direction)
+  if(composerId !== id) return;
+  const a = state.annotations.find(x=>x.id===id); if(!a) return;
+  const t = $('#composer textarea');
+  if(t && t.value !== a.comment){ t.value = a.comment; const p=$('#composer [data-act=post]'); if(p) p.disabled = !a.comment.trim(); }
+}
+
+// Click-outside behavior (spec §1): a click outside the open composer either
+// cancels an empty draft or keeps a non-empty draft and simply closes the popover.
+document.addEventListener('mousedown', e=>{
+  const c = $('#composer'); if(!c || c.contains(e.target)) return;
+  if(e.target.closest('#panel')) return;             // interacting with the rail keeps the draft editable
+  const a = state.annotations.find(x=>x.id===composerId);
+  if(a && !(a.comment||'').trim()) cancelDraft(composerId);   // empty → cancel (removes mark + card)
+  else { closeComposer(); renderList(); }   // has text → keep the draft; card switches from mirror to editor
+});
+
+/* ---------- first-use coach hint ---------- */
+function showCoach(){
+  try{ if(localStorage.getItem('swa.coachDone')) return; }catch(e){}
+  if(state.annotations.length) return;
+  const el=$('#coach'); if(el) el.hidden = false;
+}
+function hideCoach(done){
+  const el=$('#coach'); if(el) el.hidden = true;
+  if(done){ try{ localStorage.setItem('swa.coachDone','1'); }catch(e){} }
+}
+$('#coachClose').onclick = ()=> hideCoach(true);
+
+function setPanel(open){ state.panelOpen = open; $('#panel').classList.toggle('open', open); }
+function togglePanel(){ setPanel(!state.panelOpen); }
+function renderIdentity(){
+  const has = !!state.commenterName;
+  $('#identityUnset').hidden = has; $('#identitySet').hidden = !has;
+  if(has) $('#identityLabel').textContent = state.commenterName;
+}
+function setCommenterName(name){
+  const n = (name||'').trim(); if(!n) return;
+  state.commenterName = n; try{ localStorage.setItem('swa.commenterName', n); }catch(e){}
+  identityPrev = '';
+  $('#identity').classList.remove('flag'); renderIdentity();
+}
+function ensureName(then){
+  if(state.commenterName){ then(); return; }
+  // defer: user must name themselves first — make that unmissable
+  const id = $('#identity');
+  id.classList.remove('flag'); void id.offsetWidth;   // restart the shake animation
+  id.classList.add('flag');
+  toast('Add your name at the top to post your comment');
+  const i=$('#identityName'); if(i) i.focus();
+}
+let identityPrev = '';   // restore target for Esc during an edit
+$('#identitySave').onclick = ()=> setCommenterName($('#identityName').value);
+$('#identityName').addEventListener('keydown', e=>{
+  if(e.key==='Enter') setCommenterName($('#identityName').value);
+  else if(e.key==='Escape' && identityPrev){ state.commenterName = identityPrev; identityPrev=''; renderIdentity(); }
+});
+$('#identityEdit').onclick = ()=>{ identityPrev = state.commenterName; state.commenterName=''; renderIdentity();
+  $('#identityName').value = identityPrev; $('#identityName').focus(); $('#identityName').select(); };
+$('#panelToggle').onclick = togglePanel;
+$('#panelClose').onclick = ()=> setPanel(false);
+
+/* ---------- boot ---------- */
+(function boot(){
+  const brandEl = document.getElementById('brandName'); if (brandEl) brandEl.textContent = BRAND;
+  renderIdentity();
+  const params = new URLSearchParams(location.search);
+  cliReturn = params.get('return');               // e.g. /api/done  (CLI/skill mode)
+  if (params.get('demo')) { state.pageUrl='https://acme.example/pricing'; loadSnapshot(DEMO_SNAPSHOT); return; }
+  // restore from share link (#<lz>) if present
+  if (location.hash.length > 1) {
+    try {
+      const json = LZString.decompressFromEncodedURIComponent(location.hash.slice(1));
+      const data = JSON.parse(json);
+      if (data && data.snapshot) { hydrate(data); return; }
+    } catch(e){ /* ignore */ }
+  }
+  // CLI mode often injects the snapshot at /__snapshot.html — try fetching it
+  if (params.get('snapshot')) {
+    fetch(params.get('snapshot')).then(r=>r.text()).then(h=>{ state.pageUrl = params.get('url')||''; loadSnapshot(h); }).catch(()=>{});
+  }
+})();
+
+function hydrate(data){
+  state.snapshot = data.snapshot || ''; state.pageUrl = data.url||''; state.viewport = data.viewport||'desktop';
+  state.annotations = (data.annotations||[]).map(a=>({...a}));
+  state.seq = state.annotations.length;
+  applyViewport(); $('#loader').classList.add('hidden');
+  if (state.snapshot) {
+    frame.srcdoc = prepareSnapshot(state.snapshot);
+    frame.addEventListener('load', ()=>{ wireFrame(); renderAll(); }, {once:true});
+  } else {
+    // annotations-only share link (tiny URL): no visual snapshot embedded
+    $('#nosnap').style.display='flex'; renderAll();
+  }
+}
+
+/* ---------- loaders ---------- */
+$('#optDemo').onclick = ()=>{ state.pageUrl='https://acme.example/pricing'; loadSnapshot(DEMO_SNAPSHOT); };
+$('#optUpload').onclick = ()=> $('#fileInput').click();
+$('#fileInput').onchange = e => { const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ state.pageUrl=f.name; loadSnapshot(r.result); }; r.readAsText(f); };
+$('#urlField').onkeydown = e => { if(e.key==='Enter'){ toast('Live capture needs the ShareWithAgent extension/CLI — see the homepage.'); } };
+
+function loadSnapshot(html){
+  window.__swaReady = false;            // flips back to true on the new bridge 'ready'
+  state.snapshot = html;
+  applyViewport();
+  $('#loader').classList.add('hidden');
+  frame.srcdoc = prepareSnapshot(html);
+  frame.addEventListener('load', ()=>{ wireFrame(); renderAll(); showCoach(); }, {once:true});
+}
+
+function prepareSnapshot(html) {
+  // 1. strip any Content-Security-Policy <meta> (would block our inline bridge)
+  let out = html.replace(/<meta[^>]+http-equiv=["']?content-security-policy["']?[^>]*>/gi, '');
+  // 2. inject the highlight CSS + bridge into <head> (fallback: prepend if no <head>)
+  // Build the script tag's markers dynamically so this source file never contains a
+  // literal opening/closing script-tag sequence inside its own script body — that
+  // keeps the whole document safe to round-trip through document.write (e.g. when a
+  // self-contained export is reopened, or rehydrated by a host that re-parses it).
+  const SC = '<' + 'script', ECS = '<' + '/script>';
+  const inject = `<style>${ANNOTATION_CSS}</style>${SC}>${BRIDGE_SCRIPT}${ECS}`;
+  if (/<head[^>]*>/i.test(out)) out = out.replace(/<head([^>]*)>/i, `<head$1>${inject}`);
+  else out = inject + out;
+  return out;
+}
+
+/* ---------- viewport ---------- */
+function applyViewport(){ const v=VIEWPORTS[state.viewport]; frameWrap.style.width=v.w+'px'; frameWrap.style.height=v.h+'px'; $('#panel').classList.toggle('sheet', state.viewport==='mobile'); }
+$('#viewports').onclick = e => { const b=e.target.closest('button'); if(!b) return;
+  [...e.currentTarget.children].forEach(x=>x.classList.remove('on')); b.classList.add('on');
+  state.viewport=b.dataset.vw; applyViewport(); setTimeout(renderAll,200); };
+
+/* ---------- tools ---------- */
+$('#tools').onclick = e => { const b=e.target.closest('button'); if(!b) return; setTool(b.dataset.tool); };
+let peekTool = null, lastAlt = 0;
+function effectiveTool(){ return peekTool || state.tool; }
+function applyInputMethod(){ postToFrame({ type: BRIDGE + 'set-input-method', method: effectiveTool()==='pin'?'pinpoint':'drag' }); }
+function setTool(t) {
+  state.tool = t;
+  [...$('#tools').children].forEach(x => x.classList.toggle('on', x.dataset.tool === t));
+  applyInputMethod();
+}
+document.addEventListener('keydown', e=>{
+  if((e.metaKey||e.ctrlKey) && e.key === '.'){ e.preventDefault(); togglePanel(); return; }
+  if(e.key==='Alt' && !e.repeat){
+    if(!peekTool){ peekTool = state.tool==='pin'?'select':'pin'; applyInputMethod(); }
+    const now=Date.now(); if(now-lastAlt < 350){ peekTool=null; setTool(state.tool==='pin'?'select':'pin'); } lastAlt=now;
+    return;
+  }
+  if(e.key==='Escape' && !e.target.matches('textarea,input')){
+    // Prefer the draft actually being composed; fall back to the first draft.
+    const d=state.annotations.find(a=>a.id===composerId && a.status==='draft') || state.annotations.find(a=>a.status==='draft');
+    if(d){ cancelDraft(d.id); } else { setPanel(false); } return; }
+  if(e.target.matches('textarea,input')) return;
+  if(e.key==='v')setTool('select'); if(e.key==='p')setTool('pin'); });
+document.addEventListener('keyup', e=>{ if(e.key==='Alt' && peekTool){ peekTool=null; applyInputMethod(); } });
+
+/* ---------- frame wiring — the in-page bridge (injected into the snapshot by
+   prepareSnapshot) now owns ALL in-iframe interaction: pinpoint hover/click,
+   text selection, and mark wrapping. It talks to the parent over postMessage
+   (handled above). wireFrame is a no-op kept for the load-hook call site. ---------- */
+function wireFrame(){ /* bridge handles iframe interaction; nothing to wire here */ }
+
+/* ---------- render ---------- */
+let overflowCleanup = null;
+function closeOverflow(){ if(overflowCleanup){ overflowCleanup(); overflowCleanup = null; } }
+function renderAll() { renderList(); const n = state.annotations.length; $('#count').textContent = n; $('#ptCount').textContent = n; }
+function renderList(){
+  closeOverflow();
+  const list=$('#list');
+  const n = state.annotations.length;
+  const pc = $('#ptCount'), cc = $('#count');
+  if (pc) pc.textContent = n;
+  if (cc) cc.textContent = n;
+  if(!state.annotations.length){ list.innerHTML='<div class="empty">No comments yet.<br><b>Select</b> text or <b>Pin</b> an element — a comment box opens right where you click.</div>'; return; }
+  list.innerHTML='';
+  state.annotations.forEach((a,i)=>{
+    const expanded = a.status==='draft' || state.expanded===a.id;
+    const c=document.createElement('div');
+    c.className='card '+(expanded?'expanded':'collapsed')+(a.id===state.selected?' sel':'')+(a.status==='draft'?' draft':'');
+    c.dataset.id=a.id;
+    const snippet = esc((a.comment||'').split('\n')[0].slice(0,80)) || '…';
+    if(!expanded){
+      c.innerHTML =
+        `<div class="col"><span class="num">${i+1}</span><span class="who">${esc(a.author||'—')}</span>`+
+        `<span class="snip">${snippet}</span>`+
+        `${(a.replies&&a.replies.length)?`<span class="rc">${a.replies.length} ↩</span>`:''}</div>`;
+      c.querySelector('.col').onclick=()=>{ select(a.id); };
+    } else {
+      // While a draft's inline composer is open, the rail card is a live read-only
+      // mirror — one editor at a time (the composer). The full card editor appears
+      // when the composer is closed (e.g. click-outside kept a non-empty draft).
+      const composing = a.status==='draft' && composerId===a.id;
+      c.innerHTML =
+        `<div class="exp"><div class="top"><span class="num">${i+1}</span><span class="who">${esc(a.author||'You')}</span>`+
+        `<span class="more"><button class="dots" data-act="more">⋯</button></span></div>`+
+        `${a.anchor.selectedText?`<div class="quote">"${esc(a.anchor.selectedText.slice(0,160))}"</div>`:`<div class="quote sel-path">${esc(a.anchor.selector)}</div>`}`+
+        `${composing
+          ? `<div class="draftlive">${esc(a.comment)||'<span class="placeholder">Writing…</span>'}</div>`
+          : `<textarea placeholder="Describe the issue… (⌘↵ to save)">${esc(a.comment)}</textarea>`}`+
+        `<div class="thread">${(a.replies||[]).map(r=>`<div class="rep"><b>${esc(r.author)}</b> ${esc(r.text)}</div>`).join('')}</div>`+
+        `${a.status==='saved'?`<button class="replybtn" data-act="reply">Reply</button>
+          <div class="replybox" style="display:none"><textarea placeholder="Reply…"></textarea><button class="primary" data-act="postreply">Post</button></div>`:''}`+
+        `<div class="row">${a.status==='draft'&&!composing?`<button class="ghost" data-act="cancel">✕</button><div class="sp"></div><button class="primary" data-act="save">Comment <span class="k">⌘↵</span></button>`:''}</div>`+
+        `<div class="meta"><span class="tag">${a.viewport}</span><span class="tag">${a.type}</span></div>`;
+      const ta=c.querySelector(':scope .exp > textarea');
+      if(ta){
+        ta.oninput=e=>{ a.comment=e.target.value; syncComposerText(a.id); };  // rail → composer sync (Task 3 helper)
+        ta.onkeydown=e=>{ if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){ e.preventDefault(); saveAnnotation(a.id); }
+          else if(e.key==='Escape'){ e.preventDefault(); cancelDraft(a.id); } };
+      }
+      const sv=c.querySelector('[data-act=save]'); if(sv) sv.onclick=()=>saveAnnotation(a.id);
+      const cx=c.querySelector('[data-act=cancel]'); if(cx) cx.onclick=()=>cancelDraft(a.id);
+      if(a.status==='saved'){ c.querySelector('.top').style.cursor='pointer';
+        c.querySelector('.top').onclick=e=>{ if(e.target.closest('.more'))return; state.expanded=null; renderList(); }; }
+      const more=c.querySelector('[data-act=more]'); if(more) more.onclick=e=>{ e.stopPropagation(); toggleOverflow(c,a); };
+      const rb=c.querySelector('[data-act=reply]'); const box=c.querySelector('.replybox');
+      if(rb) rb.onclick=()=>{ box.style.display = box.style.display==='none'?'block':'none'; if(box.style.display==='block') box.querySelector('textarea').focus(); };
+      const pr=c.querySelector('[data-act=postreply]'); if(pr) pr.onclick=()=>{ addReply(a.id, box.querySelector('textarea').value); };
+    }
+    list.appendChild(c);
+  });
+}
+function toggleOverflow(card, a){
+  const wasOpen = !!card.querySelector('.menu');
+  closeOverflow();
+  if(wasOpen) return;
+  const m=document.createElement('div'); m.className='menu';
+  m.innerHTML='<button data-act="copy">📋 Copy text</button><button class="danger" data-act="del">🗑 Delete</button>';
+  card.querySelector('.more').appendChild(m);
+  m.querySelector('[data-act=copy]').onclick=()=>{ navigator.clipboard.writeText(a.anchor.selectedText||a.anchor.text||''); closeOverflow(); toast('Text copied'); };
+  m.querySelector('[data-act=del]').onclick=()=>{ closeOverflow();
+    if(a.id===composerId) closeComposer();   // deleting the annotation being composed: no zombie popover
+    postToFrame({ type: BRIDGE + 'remove-mark', id: a.id });
+    state.annotations=state.annotations.filter(x=>x.id!==a.id); if(state.selected===a.id) state.selected=null;
+    if(state.expanded===a.id) state.expanded=null; renderList(); };
+  const h=ev=>{ if(!m.contains(ev.target)) closeOverflow(); };
+  setTimeout(()=>document.addEventListener('click', h), 0);
+  overflowCleanup = ()=>{ m.remove(); document.removeEventListener('click', h); };
+}
+function select(id) {
+  state.selected = id; state.expanded = id; renderList();
+  postToFrame({ type: BRIDGE + 'scroll-to', id });
+  postToFrame({ type: BRIDGE + 'focus-mark', id });
+  const card = $(`.card[data-id="${id}"]`); if (card) card.scrollIntoView({ block: 'nearest' });
+}
+function saveAnnotation(id){ const a = state.annotations.find(x=>x.id===id); if(!a) return;
+  ensureName(()=>{ a.author = a.author || state.commenterName; a.status='saved'; state.expanded = null; closeComposer(); renderList(); }); }
+function addReply(id, text){ const a = state.annotations.find(x=>x.id===id); if(!a || !text.trim()) return;
+  ensureName(()=>{ (a.replies = a.replies || []).push({ author: state.commenterName, text: text.trim(), ts: Date.now() }); renderList(); }); }
+function cancelDraft(id){
+  // Guard BEFORE touching the composer: Esc in a saved card's textarea reaches here
+  // too, and closing another draft's live composer would strand its mirror card.
+  const a = state.annotations.find(x=>x.id===id); if(!a || a.status!=='draft') return false;
+  if (composerId === id) closeComposer();   // only close the composer if it's THIS draft's
+  postToFrame({ type: BRIDGE + 'remove-mark', id }); state.annotations = state.annotations.filter(x=>x.id!==id);
+  if(state.selected===id) state.selected=null; renderList(); return true; }
+function focusComment(id){ setTimeout(()=>{ const t=$(`.card[data-id="${id}"] textarea`); if(t){ t.focus(); } },60); }
+
+/* ---------- export ---------- */
+function buildPayload(){
+  return { tool:BRAND, version:'0.1', url:state.pageUrl, viewport:VIEWPORTS[state.viewport].label, capturedWith:cliReturn?'cli':'web', createdCount:state.annotations.length,
+    annotations: state.annotations.map((a,i)=>({ id:a.id, n:i+1, comment:a.comment, status:a.status, type:a.type, viewport:a.viewport,
+      author:a.author||null, replies:a.replies||[], anchor:a.anchor })) };
+}
+/* Compact, prompt-friendly Markdown. One line of feedback + one line locating the
+   exact element. Box / computed styles / element HTML stay in the JSON export —
+   keep this and cli.mjs's markdown() in the same shape (intentional twins). */
+function toMarkdown(){
+  const p=buildPayload();
+  let s=`# ${BRAND} feedback — ${p.url||'(uploaded snapshot)'} (${p.viewport}, ${p.annotations.length} item${p.annotations.length===1?'':'s'})\n\n`;
+  s+=`_Each item: **author:** "comment" → the page element it refers to (CSS selector into the page DOM)._\n\n`;
+  p.annotations.forEach(a=>{
+    s+=`${a.n}. ${a.author?`**${a.author}:** `:''}"${a.comment||'(no comment)'}"${a.status==='saved'?'':' _(draft)_'}\n`;
+    s+= a.anchor.selectedText
+      ? `   → selected "${a.anchor.selectedText}" in \`${a.anchor.selector}\`\n`
+      : `   → \`${a.anchor.selector}\`${a.anchor.text?` — "${a.anchor.text}"`:''}\n`;
+    (a.replies||[]).forEach(r=>{ s+=`   ↳ **${r.author}:** ${r.text}\n`; });
+    s+=`\n`;
+  });
+  s+=`_Full anchors (bounding box, computed styles, element HTML) are in the structured JSON export._\n`;
+  return s;
+}
+function download(name, text, type='text/plain'){ const b=new Blob([text],{type}); const u=URL.createObjectURL(b); const a=document.createElement('a'); a.href=u; a.download=name; a.click(); URL.revokeObjectURL(u); }
+function shareLink(){ /* annotations only — never the snapshot, or the URL explodes (megabytes). The agent needs the text, not the picture. */
+  if (typeof LZString === 'undefined') { toast('Share links need the online viewer — open the page in ShareWithAgent to share.'); return null; }
+  const data={url:state.pageUrl,viewport:state.viewport,annotations:state.annotations};
+  return location.origin+location.pathname+'#'+LZString.compressToEncodedURIComponent(JSON.stringify(data)); }
+function exportSelfContained() {
+  // unwrap existing marks so find-and-mark re-applies cleanly on reopen (no double-marking)
+  if (frame.contentDocument) {
+    frame.contentDocument.querySelectorAll('mark.swa-hl[data-swa-id]').forEach(m => {
+      const p = m.parentNode; while (m.firstChild) p.insertBefore(m.firstChild, m); p.removeChild(m); p.normalize();
+    });
+  }
+  // Capture the live iframe DOM (so cleared overlays etc. persist), but strip the
+  // bridge we injected via prepareSnapshot — on reopen hydrate re-injects it, and two
+  // bridges would each replay find-and-mark (double marks). Operate on a clone so the
+  // live iframe keeps working.
+  let snap = state.snapshot;
+  if (frame.contentDocument) {
+    const root = frame.contentDocument.documentElement.cloneNode(true);
+    root.querySelectorAll('script').forEach(s => { if (/swa-bridge-|PREFIX\s*=/.test(s.textContent || '')) s.remove(); });
+    root.querySelectorAll('style').forEach(s => { if (/\.swa-hl\b/.test(s.textContent || '')) s.remove(); });
+    root.querySelectorAll('[data-swa-pinpoint-label]').forEach(n => n.remove());
+    snap = '<!doctype html>' + root.outerHTML;
+  }
+  const data = { snapshot: snap, url: state.pageUrl, viewport: state.viewport, annotations: state.annotations };
+  // Serialize a CLONE of the shell with the iframe's live srcdoc stripped: on reopen
+  // the baked-in snapshot would otherwise load (and fire the bridge 'ready') BEFORE
+  // hydrate populates state.annotations, so the replay would mark nothing. Let hydrate
+  // own the load. Cloning keeps the live iframe (and its marks) untouched.
+  const shell = document.documentElement.cloneNode(true);
+  const cf = shell.querySelector('#frame'); if (cf) cf.removeAttribute('srcdoc');
+  const oldEmbed = shell.querySelector('script#embed'); if (oldEmbed) oldEmbed.remove();
+  // Drop the lz-string CDN tag: it's a parser-blocking external script that, in a
+  // freshly-parsed reopened document, can abort parsing (or fail to reach the CDN) and
+  // skip the embed/boot scripts. It's only used for share-link hash restore, which a
+  // reopened export never does (no hash, and that path is try/caught). Remove it.
+  shell.querySelectorAll('script[src*="lz-string"]').forEach(s => s.remove());
+  const docHtml = shell.outerHTML;
+  // The embedded snapshot can contain a literal closing script tag (e.g. the bridge it
+  // carries), which would prematurely close the embed script tag. Escape it so the JSON
+  // survives re-parsing on reopen. (Tags built dynamically so this source file never
+  // contains the raw sequences inside its own script body.)
+  const SC = '<' + 'script', ECS = '<' + '/script>';
+  const closeTag = new RegExp('<\\/' + 'script', 'gi');
+  const json = JSON.stringify(data).replace(closeTag, '<\\/script');
+  const inject = `${SC} id="embed">window.__EMBED__=${json};` +
+    `addEventListener('DOMContentLoaded',()=>setTimeout(()=>{if(window.__EMBED__)hydrate(window.__EMBED__)},0));${ECS}`;
+  // Inject before the LAST body-close tag: the page's own scripts embed snapshots
+  // (e.g. DEMO_SNAPSHOT) whose markup contains an earlier literal body-close, so a
+  // naive first-match replace would splice the embed into the middle of a script.
+  const BODY_CLOSE = '<' + '/body>';
+  const cut = docHtml.lastIndexOf(BODY_CLOSE);
+  return '<!doctype html>' + (cut === -1
+    ? docHtml + inject + BODY_CLOSE
+    : docHtml.slice(0, cut) + inject + docHtml.slice(cut));
+}
+
+/* ---------- Share menu (CLI send / .html / link / copy md / json) ---------- */
+function buildShareMenu(){
+  const pop = $('#shareMenu .pop');
+  pop.innerHTML =
+    (cliReturn?'<div class="hint">Send</div><button data-share="cli">▸ Send to Agent CLI</button>':'') +
+    '<div class="hint">Share with a person</div>' +
+    '<button data-share="html">⬇ Download review (.html)</button>' +
+    '<button data-share="link">🔗 Copy link (annotations-only)</button>' +
+    '<div class="hint">For an agent</div>' +
+    '<button data-share="md">📋 Copy Markdown</button>' +
+    '<button data-share="json">⬇ Structured JSON</button>';
+}
+buildShareMenu();
+$('#shareToggle').onclick = e => { e.stopPropagation(); $('#shareMenu').classList.toggle('open'); };
+document.addEventListener('click', ()=> $('#shareMenu').classList.remove('open'));
+$('#shareMenu .pop').onclick = async e => { const b=e.target.closest('button'); if(!b) return; const k=b.dataset.share;
+  if(k==='cli'){ await sendToCli(); }
+  if(k==='html'){ download('review.html', exportSelfContained(), 'text/html'); }
+  if(k==='link'){ const u=shareLink(); if(u){ navigator.clipboard.writeText(u); toast('Link copied — recipient needs the hosted viewer (or open in ShareWithAgent) for the full page'); } }
+  if(k==='md'){ navigator.clipboard.writeText(toMarkdown()); toast('Markdown copied — paste into your agent'); }
+  if(k==='json'){ download('feedback.json', JSON.stringify(buildPayload(),null,2), 'application/json'); }
+  $('#shareMenu').classList.remove('open');
+};
+
+/* ---------- auto-clear cookie banners / modal overlays from the snapshot ---------- */
+$('#clearOverlays').onclick = ()=>{
+  const doc=frame.contentDocument, win=frame.contentWindow; if(!doc||!win){ toast('Load a page first'); return; }
+  const vw=win.innerWidth, vh=win.innerHeight; let n=0;
+  [...doc.body.querySelectorAll('*')].forEach(el=>{
+    const cs=win.getComputedStyle(el); if(cs.display==='none') return;
+    const pos=cs.position, z=parseInt(cs.zIndex)||0, r=el.getBoundingClientRect();
+    const big = r.width*r.height > vw*vh*0.2;
+    const idcls=(el.id+' '+(typeof el.className==='string'?el.className:'')).toLowerCase();
+    const consenty=/cookie|consent|gdpr|\bcmp\b|banner|backdrop|overlay|modal|dialog/.test(idcls);
+    const fixedish = pos==='fixed'||pos==='sticky';
+    if((fixedish && (big || z>=999)) || (consenty && (fixedish||big))){ el.style.setProperty('display','none','important'); n++; }
+  });
+  renderAll(); toast(n ? `Cleared ${n} overlay element(s)` : 'No obvious overlays found');
+};
+
+/* ---------- CLI / skill return ---------- */
+async function sendToCli(){
+  try{ const res=await fetch(cliReturn, {method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify(buildPayload())});
+    if(res.ok){ toast('Sent to agent ✓ — you can close this tab'); } else toast('Send failed ('+res.status+')'); }
+  catch(e){ toast('Send failed — is the CLI still running?'); }
+}
+
+/* ---------- util ---------- */
+function esc(s){ return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+let toastT; function toast(m){ const t=$('#toast'); t.textContent=m; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),2600); }
+
+/* test seam */
+window.__swa = { setTool, effectiveTool, loadSnapshot, exportSelfContained, togglePanel, setPanel, get state(){ return state; }, buildPayload, saveAnnotation, toMarkdown };
+
+/* expose for embed-mode reopen */
+window.hydrate = hydrate;
+})(); // end IIFE
+</script>
+</body>
+</html>
