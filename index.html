@@ -105,14 +105,38 @@
     <span class="pill">Open source · agent-native</span>
     <h1>Visual feedback your<br><span class="grad">coding agent can act on</span></h1>
     <p class="lead">Click or speak on any web page. ShareWithAgent anchors every comment to a real DOM element and hands your coding agent <i>“button <code>.hero__cta</code>, contrast too low”</i> — not “something near (840, 312).”</p>
-    <div class="cta">
-      <a class="btn primary" href="./app.html">▶ Try the live demo</a>
-      <a class="btn" href="https://github.com/Holzherr/sharewithagent" target="_blank" rel="noopener">★ Star on GitHub</a>
-    </div>
-    <div class="install">
-      <span><span class="mono">npx sharewithagent annotate https://your.app</span></span>
-      <button onclick="navigator.clipboard.writeText('npx sharewithagent annotate https://your.app');this.textContent='Copied'">Copy</button>
-    </div>
+    <style>
+      .herocap{display:flex;gap:8px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:14px;padding:8px 8px 8px 16px;box-shadow:0 10px 34px -10px rgba(15,23,42,.28);max-width:620px;margin:6px auto 0}
+      .herocap input{flex:1;border:0;outline:none;font:inherit;font-size:15px;color:var(--ink);background:transparent;min-width:0}
+      .herocap button{flex:none;border:0;background:var(--accent);color:#fff;font:inherit;font-weight:600;font-size:15px;padding:11px 18px;border-radius:10px;cursor:pointer;white-space:nowrap}
+      .herocap button:disabled{opacity:.55;cursor:default}
+      .herohint{margin:12px auto 0;color:var(--mut);font-size:13.5px;max-width:620px}
+      .herohint a{color:var(--accent);text-decoration:none;font-weight:600}
+      @media(max-width:560px){.herocap{flex-direction:column;align-items:stretch}.herocap button{width:100%}}
+    </style>
+    <form class="herocap" id="heroCap">
+      <input id="heroUrl" type="url" placeholder="Paste any URL — e.g. https://your.app" required autocomplete="off" spellcheck="false" />
+      <button type="submit" id="heroGo">Capture &amp; annotate →</button>
+    </form>
+    <p class="herohint">Nothing to install — paste a public URL and start marking it up. For logged-in, internal, or CSP-strict pages, use the <a href="#how">bookmarklet, extension, or terminal</a> below.</p>
+    <script>
+      window.SWA_CAPTURE_ENDPOINT = "https://sharewithagent-capture.nickholzherr.workers.dev";
+      (function(){
+        var f=document.getElementById('heroCap'); if(!f) return;
+        f.addEventListener('submit', async function(e){
+          e.preventDefault();
+          var u=document.getElementById('heroUrl').value.trim(); if(!u) return;
+          var b=document.getElementById('heroGo'); b.textContent='Capturing…'; b.disabled=true;
+          try{
+            var r=await fetch(window.SWA_CAPTURE_ENDPOINT+'/api/capture',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({url:u})});
+            var d=await r.json();
+            if(d.viewer){ location.href=window.SWA_CAPTURE_ENDPOINT+d.viewer; return; }
+            alert(d.error||'Capture failed');
+          }catch(err){ alert('Capture failed: '+err.message); }
+          b.textContent='Capture & annotate →'; b.disabled=false;
+        });
+      })();
+    </script>
 
     <div class="shot" aria-hidden="true">
       <div class="chrome"><i></i><i></i><i></i></div>
@@ -137,9 +161,9 @@
 
 <div class="wrap">
   <section id="how">
-    <div class="sec-h"><h2>Four ways to use it — pick the one that fits</h2><p>However you start, you get the same thing back: every comment anchored to a real DOM element (CSS selector + box + element HTML + styles), plus a prompt-ready Markdown digest.</p></div>
+    <div class="sec-h"><h2>Other ways to use it</h2><p>Rather not paste a URL — or need a logged-in, internal, or CSP-strict page? Same result every way: every comment anchored to a real DOM element (CSS selector + box + element HTML + styles), plus a prompt-ready Markdown digest.</p></div>
     <style>
-      .ways{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+      .ways{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
       .way{border:1px solid var(--line);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:8px}
       .way h3{margin:0;font-size:16px;display:flex;align-items:center;gap:8px}
       .way .tag{font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;background:#eef2ff;color:var(--accent)}
@@ -172,24 +196,12 @@
         <a class="btn" style="align-self:flex-start;padding:8px 14px" href="./sharewithagent-extension.zip" download>⬇ Download extension</a>
         <p class="hint-sm">Chrome/Edge: unzip → <code class="mono">chrome://extensions</code> → Developer mode → Load unpacked.</p>
       </div>
-      <div class="way">
-        <h3>🌐 Hosted — paste a URL <span class="tag soon">self-host</span></h3>
-        <p>Paste a public URL and get the annotator, nothing to run. Powered by a serverless <a href="https://github.com/Holzherr/sharewithagent/blob/main/worker/README.md">Cloudflare Worker</a> (Browser Rendering) — deploy it in ~2 min to switch this on. (For auth-gated pages, use the extension.)</p>
-        <form id="hostedForm" style="display:none;gap:8px;margin-top:2px"><input id="hostedUrl" type="url" placeholder="https://example.com" style="flex:1;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px"><button class="btn primary" style="padding:8px 14px" type="submit">Capture</button></form>
-      </div>
     </div>
     <script>
       // Bookmarklet: injects the hosted overlay onto the current page.
       document.getElementById('bmlet').setAttribute('href',
         "javascript:(function(){if(window.__swabLoaded){return;}var s=document.createElement('script');s.src='https://sharewithagent.com/bookmarklet/overlay.js?v='+Date.now();document.body.appendChild(s);})();");
       document.getElementById('bmlet').addEventListener('click',function(e){e.preventDefault();alert('Drag this button up to your bookmarks bar — then click it on any page you want to annotate.');});
-      // Hosted capture endpoint (Cloudflare Worker — Browser Rendering).
-      window.SWA_CAPTURE_ENDPOINT = "https://sharewithagent-capture.nickholzherr.workers.dev";
-      // Hosted form appears only when a capture endpoint is configured.
-      if (window.SWA_CAPTURE_ENDPOINT) {
-        var f=document.getElementById('hostedForm'); f.style.display='flex';
-        f.addEventListener('submit',async function(e){e.preventDefault();var u=document.getElementById('hostedUrl').value;var b=f.querySelector('button');b.textContent='Capturing…';b.disabled=true;try{var r=await fetch(window.SWA_CAPTURE_ENDPOINT+'/api/capture',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({url:u})});var d=await r.json();if(d.viewer){location.href=window.SWA_CAPTURE_ENDPOINT+d.viewer;}else{alert(d.error||'Capture failed');}}catch(err){alert('Capture failed: '+err.message);}b.textContent='Capture';b.disabled=false;});
-      }
     </script>
   </section>
 
@@ -218,14 +230,13 @@
     <div class="charity">
       <h2>The hosted version gives everything away</h2>
       <div class="big">100% → charity</div>
-      <p>ShareWithAgent is free and open-source forever — self-host it for nothing. The optional hosted instance costs $5/month, and every penny (after card fees) is donated. It’s a tool I built for myself; if it earns, a charity should keep it.</p>
+      <p>ShareWithAgent is free and open-source forever — self-host it for nothing. The optional hosted instance costs $5/month, and every penny (after card fees) is donated.</p>
     </div>
   </section>
 </div>
 
 <footer>
-  <div class="wrap">ShareWithAgent · open-source visual feedback for the agent era · MIT · a personal project by Nick Holzherr<br>
-  <span style="font-size:12px">Working name — final name &amp; domain TBD.</span></div>
+  <div class="wrap">ShareWithAgent · open-source visual feedback for the agent era · MIT · a personal project by Nick Holzherr</div>
 </footer>
 
 </body>

@@ -70,7 +70,9 @@ async function rateLimited(env, ip) {
   return false;
 }
 
-// Freeze the rendered page: full DOM + a <base> so relative assets resolve, scripts stripped.
+// Freeze the rendered page into a SELF-CONTAINED snapshot: inline every readable
+// stylesheet (so utility classes like `.fixed` still apply even if the origin later
+// goes away), strip scripts, and add a <base> so images/fonts still resolve.
 async function freeze(env, url) {
   const browser = await puppeteer.launch(env.MYBROWSER);
   try {
@@ -78,10 +80,23 @@ async function freeze(env, url) {
     await page.setViewport({ width: 1024, height: 800 });
     await page.goto(url, { waitUntil: 'networkidle0', timeout: 20000 });
     const html = await page.evaluate((href) => {
+      // Inline all readable (same-origin + inline) stylesheets. Cross-origin sheets
+      // throw on .cssRules (CORS) — we skip those and leave their <link> in place.
+      let css = '';
+      for (const sheet of Array.from(document.styleSheets)) {
+        try { css += Array.from(sheet.cssRules).map(r => r.cssText).join('\n') + '\n'; }
+        catch (e) { /* cross-origin — cannot read */ }
+      }
+      // Drop the <link>s we successfully inlined (their sheet was readable).
+      document.querySelectorAll('link[rel="stylesheet"]').forEach(l => {
+        try { if (l.sheet && l.sheet.cssRules) l.remove(); } catch (e) { /* keep cross-origin */ }
+      });
+      const style = document.createElement('style'); style.textContent = css;
+      document.head && document.head.appendChild(style);
       // strip scripts so the page's JS doesn't re-run inside the annotator
       document.querySelectorAll('script').forEach(s => s.remove());
       const base = document.createElement('base'); base.href = href;
-      document.head?.insertBefore(base, document.head.firstChild);
+      document.head && document.head.insertBefore(base, document.head.firstChild);
       return '<!doctype html>' + document.documentElement.outerHTML;
     }, url);
     return html;
@@ -114,7 +129,9 @@ export default {
     }
 
     if (request.method === 'GET' && url.pathname === '/') {
-      return new Response(VIEWER, { headers: { 'content-type': 'text/html' } });
+      // Tell the annotator it's in hosted mode → it shows the editable URL bar.
+      const hosted = VIEWER.replace('</head>', '<script>window.SWA_CAPTURE_ENDPOINT=location.origin;</script></head>');
+      return new Response(hosted, { headers: { 'content-type': 'text/html' } });
     }
 
     const rMatch = url.pathname.match(/^\/r\/([a-z0-9]+)$/i);

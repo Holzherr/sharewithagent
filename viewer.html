@@ -119,6 +119,13 @@
   #identity #identityEdit{background:#f1f5f9;color:var(--muted,#64748b);width:28px;height:28px;padding:0}
   #identity.flag input{box-shadow:0 0 0 3px rgba(220,38,38,.28)}
   #identity.flag{animation:swaShake .4s ease}
+  /* hosted URL bar — hop to another page without leaving the annotator */
+  #urlbar{position:fixed;top:12px;left:14px;z-index:61;display:flex;gap:6px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:5px 5px 5px 11px;box-shadow:0 2px 10px -2px rgba(15,23,42,.14)}
+  #urlbar[hidden]{display:none}
+  #urlbar .ic{color:var(--muted,#64748b);font-size:13px}
+  #urlbar input{border:0;outline:none;font:inherit;font-size:13px;width:300px;max-width:44vw;color:var(--ink);background:transparent}
+  #urlbar button{border:0;background:var(--accent,#4f46e5);color:#fff;border-radius:7px;padding:6px 13px;font:inherit;font-weight:600;font-size:12px;cursor:pointer}
+  #urlbar button:disabled{opacity:.5;cursor:default}
   @keyframes swaShake{0%,100%{transform:translateX(-50%)}25%{transform:translateX(calc(-50% - 7px))}75%{transform:translateX(calc(-50% + 7px))}}
   /* first-use coach hint */
   #coach[hidden]{display:none}
@@ -134,6 +141,12 @@
 </style>
 </head>
 <body>
+
+<div id="urlbar" hidden>
+  <span class="ic">🔗</span>
+  <input id="urlbarInput" type="url" placeholder="Paste a URL to annotate…" autocomplete="off" spellcheck="false" />
+  <button id="urlbarGo">Go</button>
+</div>
 
 <div id="identity">
   <span id="identityUnset"><span class="lbl">🖊️ Your name</span>
@@ -1051,6 +1064,22 @@ $('#panelClose').onclick = ()=> setPanel(false);
   renderIdentity();
   const params = new URLSearchParams(location.search);
   cliReturn = params.get('return');               // e.g. /api/done  (CLI/skill mode)
+  // Hosted mode: show an editable URL bar so you can hop to the next page in place.
+  if (window.SWA_CAPTURE_ENDPOINT) {
+    const bar=$('#urlbar'), input=$('#urlbarInput'), go=$('#urlbarGo');
+    bar.hidden=false;
+    const cur=params.get('url'); if(cur) input.value=cur;
+    const capture=async()=>{ const u=input.value.trim(); if(!u) return;
+      go.disabled=true; go.textContent='…';
+      try{ const r=await fetch(window.SWA_CAPTURE_ENDPOINT+'/api/capture',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({url:u})});
+        const d=await r.json();
+        if(d.viewer){ location.href=window.SWA_CAPTURE_ENDPOINT+d.viewer; return; }
+        toast(d.error||'Capture failed'); }
+      catch(e){ toast('Capture failed: '+e.message); }
+      go.disabled=false; go.textContent='Go'; };
+    go.onclick=capture;
+    input.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); capture(); } });
+  }
   if (params.get('demo')) { state.pageUrl='https://acme.example/pricing'; loadSnapshot(DEMO_SNAPSHOT); return; }
   // restore from share link (#<lz>) if present
   if (location.hash.length > 1) {
@@ -1357,9 +1386,13 @@ $('#clearOverlays').onclick = ()=>{
     const pos=cs.position, z=parseInt(cs.zIndex)||0, r=el.getBoundingClientRect();
     const big = r.width*r.height > vw*vh*0.2;
     const idcls=(el.id+' '+(typeof el.className==='string'?el.className:'')).toLowerCase();
-    const consenty=/cookie|consent|gdpr|\bcmp\b|banner|backdrop|overlay|modal|dialog/.test(idcls);
+    // Strong signals (cookie/consent/gdpr/cmp) hide regardless of layout — even if the
+    // page's CSS didn't load and the banner computes as static. Weaker signals
+    // (banner/overlay/modal/…) still need a fixed/sticky or large footprint.
+    const strong=/cookie|consent|gdpr|\bcmp\b/.test(idcls);
+    const weak=/banner|backdrop|overlay|modal|dialog/.test(idcls);
     const fixedish = pos==='fixed'||pos==='sticky';
-    if((fixedish && (big || z>=999)) || (consenty && (fixedish||big))){ el.style.setProperty('display','none','important'); n++; }
+    if((fixedish && (big || z>=999)) || strong || (weak && (fixedish||big))){ el.style.setProperty('display','none','important'); n++; }
   });
   renderAll(); toast(n ? `Cleared ${n} overlay element(s)` : 'No obvious overlays found');
 };
