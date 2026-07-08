@@ -174,7 +174,7 @@
       </div>
       <div class="way">
         <h3>🌐 Hosted — paste a URL <span class="tag soon">self-host</span></h3>
-        <p>Paste a public URL and get the annotator, nothing to run. The capture service is built + SSRF-hardened; a public instance isn't live yet — <a href="https://github.com/Holzherr/sharewithagent/blob/main/hosted/deploy.md">self-host it</a> in the meantime.</p>
+        <p>Paste a public URL and get the annotator, nothing to run. Powered by a serverless <a href="https://github.com/Holzherr/sharewithagent/blob/main/worker/README.md">Cloudflare Worker</a> (Browser Rendering) — deploy it in ~2 min to switch this on. (For auth-gated pages, use the extension.)</p>
         <form id="hostedForm" style="display:none;gap:8px;margin-top:2px"><input id="hostedUrl" type="url" placeholder="https://example.com" style="flex:1;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px"><button class="btn primary" style="padding:8px 14px" type="submit">Capture</button></form>
       </div>
     </div>

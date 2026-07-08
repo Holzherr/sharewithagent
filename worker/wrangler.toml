@@ -1,0 +1,24 @@
+name = "sharewithagent-capture"
+main = "index.mjs"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Cloudflare Browser Rendering — the headless browser that freezes pages.
+browser = { binding = "MYBROWSER" }
+
+# KV: snapshot store (30-min TTL) + a rate-limit counter. Create these and paste the ids:
+#   npx wrangler kv namespace create SNAPS
+#   npx wrangler kv namespace create RL
+kv_namespaces = [
+  { binding = "SNAPS", id = "REPLACE_WITH_SNAPS_KV_ID" },
+  { binding = "RL",    id = "REPLACE_WITH_RL_KV_ID" },
+]
+
+# Import viewer.html (repo root) as a text module so the Worker can serve the annotator.
+[[rules]]
+type = "Text"
+globs = ["**/*.html"]
+fallthrough = true
+
+# Optional: serve on a subdomain of your zone instead of *.workers.dev
+# routes = [ { pattern = "capture.sharewithagent.com", custom_domain = true } ]
