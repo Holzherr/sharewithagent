@@ -131,7 +131,7 @@ export default {
     if (request.method === 'GET' && url.pathname === '/') {
       // Tell the annotator it's in hosted mode → it shows the editable URL bar.
       const hosted = VIEWER.replace('</head>', '<script>window.SWA_CAPTURE_ENDPOINT=location.origin;</script></head>');
-      return new Response(hosted, { headers: { 'content-type': 'text/html' } });
+      return new Response(hosted, { headers: { 'content-type': 'text/html', 'cache-control': 'no-store' } });
     }
 
     const rMatch = url.pathname.match(/^\/r\/([a-z0-9]+)$/i);
