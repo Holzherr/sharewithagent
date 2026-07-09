@@ -52,6 +52,10 @@
   .card.sel { border-color:var(--accent); box-shadow:0 0 0 3px rgba(79,70,229,.1); }
   .card .top { display:flex; align-items:center; gap:8px; margin-bottom:7px; min-width:0; }
   .card .num { width:20px; height:20px; border-radius:50%; background:var(--accent); color:#fff; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; flex:0 0 auto; }
+  .card .num svg { width:12px; height:12px; display:block; }
+  .card .num.pin svg { width:13px; height:13px; }
+  .bottombar .ti { width:15px; height:15px; flex:none; }
+  #coach .ti { width:14px; height:14px; vertical-align:-3px; }
   .card .sel-path { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px; color:var(--sub); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; }
   .quote { font-size:11.5px; color:var(--ink); background:#fafaff; border-left:3px solid var(--accent2); border-radius:0 6px 6px 0; padding:5px 8px; margin-bottom:6px; line-height:1.4; }
   /* inline selection composer (replaces the old floating toolbar) */
@@ -164,16 +168,16 @@
     <div class="nosnap" id="nosnap"><div><div style="font-size:30px;margin-bottom:8px">🔗🤖</div><b>Annotations-only link</b><br>The page snapshot isn’t embedded (keeps the link tiny). The feedback is in the panel.<br><span style="font-size:12px">For the full visual review, use the <b>.html</b> export instead.</span></div></div>
   </div>
   <aside class="panel" id="panel">
-    <div class="phead"><h2>Comments <span class="count" id="count">0</span></h2>
+    <div class="phead"><h2>Annotations <span class="count" id="count">0</span></h2>
       <button class="pclose" id="panelClose" title="Close (Esc)">×</button></div>
-    <div class="list" id="list"><div class="empty">No comments yet.<br><b>Select</b> text or <b>Pin</b> an element — a comment box opens right where you click.</div></div>
+    <div class="list" id="list"><div class="empty">No annotations yet.<br><b>Select</b> text or <b>Pin</b> an element — a comment box opens right where you click.</div></div>
   </aside>
 </div>
 
 <div class="bottombar" id="bottombar">
   <div class="grp" id="tools">
-    <button data-tool="select" class="on" title="Select text to comment on (V)">⌖ Select</button>
-    <button data-tool="pin" title="Click an element to comment on (P)">✎ Pin</button>
+    <button data-tool="select" class="on" title="Select text to comment on (V)"><svg class="ti" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5h8M8 19h8M12 5v14"/></svg> Select</button>
+    <button data-tool="pin" title="Click an element to comment on (P)"><svg class="ti" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s6-5.4 6-10.2A6 6 0 1 0 6 10.8C6 15.6 12 21 12 21Z"/><circle cx="12" cy="10.5" r="2.1"/></svg> Pin</button>
   </div>
   <span class="bsep"></span>
   <div class="grp" id="viewports">
@@ -182,14 +186,14 @@
   </div>
   <span class="bsep"></span>
   <button class="bbtn" id="clearOverlays" title="Remove cookie banners / modal overlays">🍪</button>
-  <button class="bbtn" id="panelToggle" title="Comments panel (⌘.)">💬 <span id="ptCount">0</span></button>
+  <button class="bbtn" id="panelToggle" title="Annotations panel (⌘.)">💬 <span id="ptCount">0</span></button>
   <div class="menu" id="shareMenu">
     <button class="bbtn primary" id="shareToggle">⤴ Share</button>
     <div class="pop"></div>
   </div>
 </div>
 
-<div id="coach" hidden><b>⌖ Select text</b> or <b>✎ Pin an element</b> — a comment box opens right there<button id="coachClose" title="Dismiss">✕</button></div>
+<div id="coach" hidden><b><svg class="ti" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5h8M8 19h8M12 5v14"/></svg> Select text</b> or <b><svg class="ti" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s6-5.4 6-10.2A6 6 0 1 0 6 10.8C6 15.6 12 21 12 21Z"/><circle cx="12" cy="10.5" r="2.1"/></svg> Pin an element</b> — a comment box opens right there<button id="coachClose" title="Dismiss">✕</button></div>
 
 <div class="loader" id="loader">
   <div class="panel">
@@ -1177,6 +1181,12 @@ document.addEventListener('keyup', e=>{ if(e.key==='Alt' && peekTool){ peekTool=
 function wireFrame(){ /* bridge handles iframe interaction; nothing to wire here */ }
 
 /* ---------- render ---------- */
+// Annotation-type glyphs for the card badge (instead of an ordinal number):
+// a text-selection I-beam for text, a map-pin for pinned elements.
+const ICON_TEXT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5h8M8 19h8M12 5v14"/></svg>';
+const ICON_PIN  = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s6-5.4 6-10.2A6 6 0 1 0 6 10.8C6 15.6 12 21 12 21Z"/><circle cx="12" cy="10.5" r="2.1"/></svg>';
+const typeIcon = a => a.type==='pin' ? ICON_PIN : ICON_TEXT;
+const typeLabel = a => a.type==='pin' ? 'Pinned element' : 'Selected text';
 let overflowCleanup = null;
 function closeOverflow(){ if(overflowCleanup){ overflowCleanup(); overflowCleanup = null; } }
 function renderAll() { renderList(); const n = state.annotations.length; $('#count').textContent = n; $('#ptCount').textContent = n; }
@@ -1187,7 +1197,7 @@ function renderList(){
   const pc = $('#ptCount'), cc = $('#count');
   if (pc) pc.textContent = n;
   if (cc) cc.textContent = n;
-  if(!state.annotations.length){ list.innerHTML='<div class="empty">No comments yet.<br><b>Select</b> text or <b>Pin</b> an element — a comment box opens right where you click.</div>'; return; }
+  if(!state.annotations.length){ list.innerHTML='<div class="empty">No annotations yet.<br><b>Select</b> text or <b>Pin</b> an element — a comment box opens right where you click.</div>'; return; }
   list.innerHTML='';
   state.annotations.forEach((a,i)=>{
     const expanded = a.status==='draft' || state.expanded===a.id;
@@ -1197,7 +1207,7 @@ function renderList(){
     const snippet = esc((a.comment||'').split('\n')[0].slice(0,80)) || '…';
     if(!expanded){
       c.innerHTML =
-        `<div class="col"><span class="num">${i+1}</span><span class="who">${esc(a.author||'—')}</span>`+
+        `<div class="col"><span class="num ${a.type}" title="${typeLabel(a)}">${typeIcon(a)}</span><span class="who">${esc(a.author||'—')}</span>`+
         `<span class="snip">${snippet}</span>`+
         `${(a.replies&&a.replies.length)?`<span class="rc">${a.replies.length} ↩</span>`:''}</div>`;
       c.querySelector('.col').onclick=()=>{ select(a.id); };
@@ -1207,7 +1217,7 @@ function renderList(){
       // when the composer is closed (e.g. click-outside kept a non-empty draft).
       const composing = a.status==='draft' && composerId===a.id;
       c.innerHTML =
-        `<div class="exp"><div class="top"><span class="num">${i+1}</span><span class="who">${esc(a.author||'You')}</span>`+
+        `<div class="exp"><div class="top"><span class="num ${a.type}" title="${typeLabel(a)}">${typeIcon(a)}</span><span class="who">${esc(a.author||'You')}</span>`+
         `<span class="more"><button class="dots" data-act="more">⋯</button></span></div>`+
         `${a.anchor.selectedText?`<div class="quote">"${esc(a.anchor.selectedText.slice(0,160))}"</div>`:`<div class="quote sel-path">${esc(a.anchor.selector)}</div>`}`+
         `${composing
